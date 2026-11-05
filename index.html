@@ -1,0 +1,958 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Honeybee OOO Viewer</title>
+<style>
+:root{
+  --bg:#f6f7fb;--card:#fff;--ink:#1e293b;--mid:#475569;--soft:#94a3b8;--line:#e2e8f0;
+  --accent:#4f46e5;--accent-ink:#fff;--accent-tint:#eef2ff;--accent-dark:#312e81;
+  --ok:#166534;--ok-bg:#dcfce7;--warn:#92400e;--warn-bg:#fef3c7;--bad:#991b1b;--bad-bg:#fee2e2;
+  --honey:#f59e0b;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1220;--card:#171a2b;--ink:#e2e8f0;--mid:#a5b0c4;--soft:#6b7690;--line:#2a2f45;
+  --accent:#818cf8;--accent-ink:#0f1220;--accent-tint:#1e2140;--accent-dark:#c7d2fe;
+  --ok:#86efac;--ok-bg:#12321f;--warn:#fcd34d;--warn-bg:#3a2c0b;--bad:#fca5a5;--bad-bg:#3b1414;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{background:linear-gradient(135deg,#312e81,#4f46e5 60%,#f59e0b);color:#fff;padding:22px 20px 18px}
+header h1{margin:0;font-size:24px;letter-spacing:-.01em}
+header p{margin:4px 0 0;opacity:.9}
+.badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.badge{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:2px 10px;font-size:12px}
+.badge b{font-weight:600}
+#conn.badge.on{background:#16a34a}#conn.badge.off{background:rgba(0,0,0,.25)}
+nav{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;align-items:center;gap:0 2px;padding:4px 12px;box-shadow:0 1px 3px rgba(15,23,42,.06)}
+nav button{border:0;background:none;color:var(--mid);padding:9px 10px;font:inherit;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+nav button:hover{color:var(--ink)}
+nav button.active{color:var(--accent);border-bottom-color:var(--accent)}
+nav .grp{color:var(--soft);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:0 4px 0 14px;white-space:nowrap}
+nav .grp:first-child{padding-left:0}
+main{max-width:1180px;margin:0 auto;padding:20px 16px 60px}
+section.screen{display:none}section.screen.active{display:block}
+h2{margin:0 0 4px;font-size:20px;color:var(--accent-dark)}
+.lede{color:var(--mid);margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:0 0 14px}
+.card h3{margin:0 0 8px;font-size:15px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:800px){.grid2{grid-template-columns:1fr}}
+.drop{display:block;width:100%;margin-top:10px;border:2px dashed var(--line);border-radius:12px;padding:20px 16px;text-align:center;color:var(--mid);cursor:pointer;background:var(--bg);transition:border-color .15s,background .15s}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-tint)}
+.drop .ic{display:block;margin-bottom:6px;color:var(--accent)}
+@media(max-width:900px){nav{position:static}}
+button[data-run].off{background:var(--line);border-color:var(--line);color:var(--mid)}
+.drop input{display:none}
+label.b{display:inline-flex;align-items:center}
+button.b,label.b{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:7px 12px;font:inherit;cursor:pointer}
+button.b:hover,label.b:hover{border-color:var(--accent)}
+.card>.row+.row,.card>.lede{margin-top:8px}
+button.p{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+button:disabled{opacity:.45;cursor:not-allowed}
+textarea,input[type=text],input[type=number],select{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 9px}
+textarea{width:100%;min-height:86px;font-family:var(--mono);font-size:12px}
+label.inl{display:inline-flex;gap:6px;align-items:center;color:var(--mid)}
+.note{border-left:3px solid var(--accent);background:var(--accent-tint);padding:8px 12px;border-radius:0 8px 8px 0;margin:8px 0;color:var(--ink)}
+.note.warn{border-color:var(--honey);background:var(--warn-bg)}
+.note.bad{border-color:#dc2626;background:var(--bad-bg)}
+.stats{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
+.stat{background:var(--accent-tint);border-radius:10px;padding:8px 14px;min-width:110px}
+.stat b{display:block;font-size:22px;color:var(--accent-dark)}
+.stat span{color:var(--mid);font-size:12px}
+.tw{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:10px;margin-top:8px}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th{position:sticky;top:0;background:var(--accent);color:#fff;text-align:left;padding:6px 8px;white-space:nowrap;font-weight:600}
+td{border-top:1px solid var(--line);padding:5px 8px;vertical-align:top;max-width:360px;overflow-wrap:anywhere}
+tr:nth-child(even) td{background:rgba(127,127,160,.05)}
+code,.mono{font-family:var(--mono);font-size:12px}
+.pill{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.bad{background:var(--bad-bg);color:var(--bad)}.pill.mut{background:var(--line);color:var(--mid)}
+.src{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);margin:8px 0}
+.src .t{font-weight:600}.src .s{color:var(--mid);font-size:12.5px}
+details summary{cursor:pointer;color:var(--accent);font-weight:500}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;max-height:380px;font-size:12px}
+.filelist{margin:8px 0;padding:0;list-style:none}
+.filelist li{display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line);font-size:13px}
+.filelist li .n{flex:1;overflow-wrap:anywhere}
+.bar{height:8px;background:var(--accent);border-radius:4px}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px}
+.kv div:nth-child(odd){color:var(--mid)}
+.copied{color:var(--ok);font-size:12px;margin-left:6px}
+.guide{border-left:4px solid var(--accent);background:linear-gradient(0deg,var(--card),var(--card))}
+ol.steps{margin:6px 0 0;padding-left:22px}ol.steps li{margin:5px 0;padding-left:4px}
+.gbox{background:var(--accent-tint);border-radius:10px;padding:10px 12px}.gbox>b{display:block;margin-bottom:4px;color:var(--accent-dark)}
+.gbox.warn{background:var(--warn-bg)}.gbox.warn>b{color:var(--warn)}.gbox ul{margin:4px 0 0;padding-left:20px}.gbox li{margin:3px 0}
+.howto{margin-top:8px;font-size:13px}.howto ol{margin:6px 0;padding-left:20px}.howto li{margin:3px 0}
+.hint{color:var(--mid);font-size:12.5px;margin:4px 0 0}
+footer{color:var(--soft);text-align:center;font-size:12px;padding:20px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🐝 Honeybee OOO Viewer</h1>
+  <p>Delivery + QC helper for Ultra Evals SxS / Honeybee L1. Everything runs in this browser tab; nothing is uploaded.</p>
+  <div class="badges">
+    <span class="badge">project <b>6a567b80aaa4d140131eae6c</b></span>
+    <span class="badge">profile <b>l1_sxs</b> (A vs B)</span>
+    <span class="badge">Redash ds <b>22</b></span>
+    <span class="badge">queue <b>L8 → L10</b>, never L12</span>
+    <span class="badge" id="conn">Redash: checking…</span>
+  </div>
+</header>
+<nav id="nav"></nav>
+<main id="main"></main>
+<footer>Honeybee delivery + QC only. GAB-38 / trajectory-model patch is out of scope. No Redash keys live in this page.</footer>
+
+<script>
+"use strict";
+/* ============================== constants ============================== */
+const PROJECT_ID = "6a567b80aaa4d140131eae6c";
+const BOT_USER = "583cf35b8b8b73054d4344e6";
+const DASHBOARD = "https://redash.scale.com/dashboards/honeybee-ooo-delivery-qc";
+const NO_DISPUTE = ["406d4b", "eff65"];
+const ID_KEYS = ["task_id", "task", "TASK", "TASK_ID"];
+const HEX24 = /[0-9a-fA-F]{24}/g;
+const CATALOG = [{"qid": 400627, "title": "Honeybee OOO \u2014 latest attempt grain", "url": "https://redash.scale.com/queries/400627", "params": ["project_id", "task_ids"], "purpose": "One latest taskattempts row per task (attempt_version, then attempted_at) with CDS hydrate source. Ops extract, not a people-count \u2014 bot excluded, scale emails stay.", "sql": "-- Honeybee OOO \u2014 latest attempt grain\n-- Grain: one row per task. QUALIFY attempt_version DESC, then attempted_at DESC.\n-- Project: Ultra Evals SxS / Honeybee L1 (default {{project_id}}).\n-- Hydration: view.cds_chat_task_attempt_responses.RESPSONSE (warehouse typo,\n-- do not \"fix\" the column name) then etl.cds_s3.s3_content, then ta.response.\n-- Datasource 22. Sibling: honeybee_qc/ingest.py latest_attempt_sql.\n-- Bot excluded. This is an ops extract, not a people-count \u2014 scale emails stay.\n\nSELECT\n    ta.task AS \"task_id\",\n    ta._id AS \"attempt_id\",\n    ta.attempt_version AS \"attempt_version\",\n    ta.attempted_at AS \"attempted_at\",\n    CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', ta.attempted_at::TIMESTAMP_NTZ) AS \"attempted_at_pt\",\n    ta.attempted_by AS \"attempted_by\",\n    ta.review_level::INT AS \"review_level\",\n    ta.attempted_at_review_level::INT AS \"attempted_at_review_level\",\n    ta.review_status AS \"review_status\",\n    ta.review_outcome AS \"review_outcome\",\n    IFF(cds.respsonse IS NOT NULL, 'cds_view',\n        IFF(s3.s3_content IS NOT NULL, 'etl_cds_s3', 'inline')) AS \"response_source\"\nFROM public.taskattempts ta\nLEFT JOIN view.cds_chat_task_attempt_responses cds\n    ON cds.task_attempt_id = ta._id\nLEFT JOIN etl.cds_s3 s3\n    ON ta.response:type::STRING = 'ResponseObject'\n   AND s3.cds_url = ta.response:url::STRING\nWHERE ta.project = '{{project_id}}'\n  AND ta.attempted_by IS NOT NULL\n  AND ta.attempted_by != '583cf35b8b8b73054d4344e6'\n  AND (\n        NULLIF(TRIM('{{task_ids}}'), '') IS NULL\n        OR ta.task IN (\n            SELECT TRIM(f.value)\n            FROM TABLE(SPLIT_TO_TABLE(REGEXP_REPLACE('{{task_ids}}', '[\\\\s\\\\n;]+', ','), ',')) f\n            WHERE TRIM(f.value) <> ''\n        )\n      )\nQUALIFY ROW_NUMBER() OVER (\n    PARTITION BY ta.task\n    ORDER BY ta.attempt_version DESC NULLS LAST,\n             ta.attempted_at DESC,\n             s3.last_updated DESC NULLS LAST\n) = 1\nORDER BY \"review_level\", \"task_id\"\n;"}, {"qid": 400628, "title": "Honeybee OOO \u2014 pair inventory by model + review level", "url": "https://redash.scale.com/queries/400628", "params": ["project_id"], "purpose": "Counts of latest attempts by Model A/B names and L8/L10/L12.", "sql": "-- Honeybee OOO \u2014 pair inventory by Model A/B + review level\n-- Grain: latest attempt per task, then counts by (model_a, model_b, review_level).\n-- L1 SxS prefillers from honeybee_qc/projects.py HONEYBEE_L1_SXS.\n-- Datasource 22. Not a people-count.\n\nWITH latest AS (\n    SELECT\n        ta.task AS task_id,\n        ta.review_level::INT AS review_level,\n        COALESCE(cds.respsonse, s3.s3_content, ta.response) AS resp\n    FROM public.taskattempts ta\n    LEFT JOIN view.cds_chat_task_attempt_responses cds\n        ON cds.task_attempt_id = ta._id\n    LEFT JOIN etl.cds_s3 s3\n        ON ta.response:type::STRING = 'ResponseObject'\n       AND s3.cds_url = ta.response:url::STRING\n    WHERE ta.project = '{{project_id}}'\n      AND ta.attempted_by IS NOT NULL\n      AND ta.attempted_by != '583cf35b8b8b73054d4344e6'\n    QUALIFY ROW_NUMBER() OVER (\n        PARTITION BY ta.task\n        ORDER BY ta.attempt_version DESC NULLS LAST, ta.attempted_at DESC\n    ) = 1\n)\nSELECT\n    COALESCE(\n        NULLIF(resp:dataSourceResults:\"before:0:data-source-string-prefiller-646efa3f869f\":content::STRING, ''),\n        'A (unnamed)'\n    ) AS \"model_a_name\",\n    COALESCE(\n        NULLIF(resp:dataSourceResults:\"before:0:data-source-string-prefiller-88fdb8d4174c\":content::STRING, ''),\n        'B (unnamed)'\n    ) AS \"model_b_name\",\n    review_level AS \"review_level\",\n    CASE review_level\n        WHEN 8 THEN 'L8'\n        WHEN 10 THEN 'L10'\n        WHEN 12 THEN 'L12'\n        ELSE CONCAT('L', COALESCE(review_level::STRING, '?'))\n    END AS \"review_level_label\",\n    COUNT(*) AS \"task_count\"\nFROM latest\nGROUP BY 1, 2, 3, 4\nORDER BY IFF(review_level IN (8, 10, 12), review_level, 99), \"task_count\" DESC\n;"}, {"qid": 400629, "title": "Honeybee OOO \u2014 missing or invalid A/B links", "url": "https://redash.scale.com/queries/400629", "params": ["project_id"], "purpose": "Latest attempts whose A or B share is missing/private/unrecognised and has no public HTML S3 fallback.", "sql": "-- Honeybee OOO \u2014 missing / invalid Model A or B final share, chat_download, HTML S3\n-- Grain: latest attempt per task.\n-- L1 SxS run steps: A step-TextCollection-29cf069962f8, B step-TextCollection-f7304e8fa411.\n-- Share hosts match honeybee_qc/links.py classify_link (structural only; no HTTP).\n-- Datasource 22.\n\nWITH latest AS (\n    SELECT\n        ta.task AS task_id,\n        ta.review_level::INT AS review_level,\n        COALESCE(cds.respsonse, s3.s3_content, ta.response) AS resp\n    FROM public.taskattempts ta\n    LEFT JOIN view.cds_chat_task_attempt_responses cds\n        ON cds.task_attempt_id = ta._id\n    LEFT JOIN etl.cds_s3 s3\n        ON ta.response:type::STRING = 'ResponseObject'\n       AND s3.cds_url = ta.response:url::STRING\n    WHERE ta.project = '{{project_id}}'\n      AND ta.attempted_by IS NOT NULL\n      AND ta.attempted_by != '583cf35b8b8b73054d4344e6'\n    QUALIFY ROW_NUMBER() OVER (\n        PARTITION BY ta.task\n        ORDER BY ta.attempt_version DESC NULLS LAST, ta.attempted_at DESC\n    ) = 1\n),\nrun AS (\n    SELECT\n        task_id,\n        review_level,\n        resp:before:\"step-TextCollection-29cf069962f8\":output AS out_a,\n        resp:before:\"step-TextCollection-f7304e8fa411\":output AS out_b\n    FROM latest\n),\nflat_a AS (\n    SELECT\n        r.task_id,\n        r.review_level,\n        'A' AS slot,\n        kv.key::STRING AS field_name,\n        kv.value::STRING AS url\n    FROM run r,\n    LATERAL FLATTEN(input => r.out_a) kv\n    WHERE TYPEOF(kv.value) = 'VARCHAR'\n      AND (\n            kv.key ILIKE '%trajectory%'\n            OR kv.key ILIKE 'field\\\\_%' ESCAPE '\\\\'\n            OR kv.key IN ('model_a_link', 'gemini_final_trajectory_a', 'gemini_0_trajectory_link')\n          )\n),\nflat_b AS (\n    SELECT\n        r.task_id,\n        r.review_level,\n        'B' AS slot,\n        kv.key::STRING AS field_name,\n        kv.value::STRING AS url\n    FROM run r,\n    LATERAL FLATTEN(input => r.out_b) kv\n    WHERE TYPEOF(kv.value) = 'VARCHAR'\n      AND (\n            kv.key ILIKE '%trajectory%'\n            OR kv.key ILIKE 'field\\\\_%' ESCAPE '\\\\'\n            OR kv.key IN ('model_b_link', 'gemini_final_trajectory_b', 'gpt_trajectory_link', 'gpt_trajectory_b')\n          )\n),\nshare AS (\n    SELECT * FROM flat_a\n    UNION ALL\n    SELECT * FROM flat_b\n),\npicked_share AS (\n    SELECT\n        task_id,\n        review_level,\n        slot,\n        field_name,\n        TRIM(url) AS url\n    FROM share\n    QUALIFY ROW_NUMBER() OVER (\n        PARTITION BY task_id, slot\n        ORDER BY IFF(field_name ILIKE '%final%', 0, 1),\n                 IFF(field_name ILIKE '%trajectory%', 0, 1),\n                 field_name\n    ) = 1\n),\nhtml AS (\n    SELECT\n        r.task_id,\n        'A' AS slot,\n        d.value:s3Url::STRING AS s3_url,\n        d.value:name::STRING AS file_name\n    FROM run r,\n    LATERAL FLATTEN(input => r.out_a:model_a_chat_download) d\n    WHERE d.value:s3Url IS NOT NULL\n      AND LOWER(COALESCE(d.value:name::STRING, '')) NOT IN ('app.html', 'bscframe.html')\n    UNION ALL\n    SELECT\n        r.task_id,\n        'B' AS slot,\n        d.value:s3Url::STRING AS s3_url,\n        d.value:name::STRING AS file_name\n    FROM run r,\n    LATERAL FLATTEN(input => r.out_b:model_b_chat_download) d\n    WHERE d.value:s3Url IS NOT NULL\n      AND LOWER(COALESCE(d.value:name::STRING, '')) NOT IN ('app.html', 'bscframe.html')\n),\npicked_html AS (\n    SELECT *\n    FROM html\n    QUALIFY ROW_NUMBER() OVER (\n        PARTITION BY task_id, slot\n        ORDER BY IFF(LOWER(file_name) LIKE '%.html' OR LOWER(file_name) LIKE '%.mhtml', 0, 1),\n                 file_name\n    ) = 1\n),\nslots AS (\n    SELECT task_id, review_level, 'A' AS slot FROM run\n    UNION ALL\n    SELECT task_id, review_level, 'B' AS slot FROM run\n)\nSELECT\n    s.task_id AS \"task_id\",\n    s.review_level AS \"review_level\",\n    s.slot AS \"slot\",\n    ps.field_name AS \"share_field\",\n    ps.url AS \"share_url\",\n    CASE\n        WHEN ps.url IS NULL OR TRIM(ps.url) = '' THEN 'missing_share'\n        WHEN ps.url ILIKE '%/app/%' OR ps.url ILIKE 'https://chatgpt.com/c/%'\n            OR ps.url ILIKE 'https://chat.openai.com/c/%' THEN 'private_not_share'\n        WHEN ps.url ILIKE '%gemini.google.com/share/%'\n          OR ps.url ILIKE '%share.gemini.google/%'\n          OR ps.url ILIKE '%chatgpt.com/share/%'\n          OR ps.url ILIKE '%chatgpt.com/s/%'\n          OR ps.url ILIKE '%chat.openai.com/share/%'\n          OR ps.url ILIKE '%chat.openai.com/s/%'\n          OR ps.url ILIKE '%claude.ai/share/%'\n            THEN 'share_ok'\n        ELSE 'unrecognised_host'\n    END AS \"share_class\",\n    ph.s3_url AS \"html_s3_url\",\n    ph.file_name AS \"html_s3_name\",\n    IFF(ph.s3_url ILIKE '%scale-cds-public%', TRUE, FALSE) AS \"has_public_html_s3\"\nFROM slots s\nLEFT JOIN picked_share ps\n    ON ps.task_id = s.task_id AND ps.slot = s.slot\nLEFT JOIN picked_html ph\n    ON ph.task_id = s.task_id AND ph.slot = s.slot\nWHERE COALESCE(ps.url, '') = ''\n   OR (\n        NOT (\n            ps.url ILIKE '%gemini.google.com/share/%'\n            OR ps.url ILIKE '%share.gemini.google/%'\n            OR ps.url ILIKE '%chatgpt.com/share/%'\n            OR ps.url ILIKE '%chatgpt.com/s/%'\n            OR ps.url ILIKE '%chat.openai.com/share/%'\n            OR ps.url ILIKE '%chat.openai.com/s/%'\n            OR ps.url ILIKE '%claude.ai/share/%'\n        )\n        AND COALESCE(ph.s3_url, '') NOT ILIKE '%scale-cds-public%'\n      )\nORDER BY s.review_level, s.task_id, s.slot\n;"}, {"qid": 400630, "title": "Honeybee OOO \u2014 flatten HTML/S3 chat downloads", "url": "https://redash.scale.com/queries/400630", "params": ["project_id", "task_ids"], "purpose": "Per-file scale-cds-public HTML/MHTML from model_*_chat_download; drops app.html / bscframe.html.", "sql": "-- Honeybee OOO \u2014 flatten HTML / S3 chat downloads from CDS-hydrated response\n-- Grain: one row per (task, slot, download file) on the latest attempt.\n-- Uses view.cds_chat_task_attempt_responses.RESPSONSE (typo is real).\n-- Drops junk app.html / bscframe.html. Keeps scale-cds-public HTML/MHTML.\n-- Datasource 22.\n\nWITH latest AS (\n    SELECT\n        ta.task AS task_id,\n        ta.review_level::INT AS review_level,\n        COALESCE(cds.respsonse, s3.s3_content, ta.response) AS resp\n    FROM public.taskattempts ta\n    LEFT JOIN view.cds_chat_task_attempt_responses cds\n        ON cds.task_attempt_id = ta._id\n    LEFT JOIN etl.cds_s3 s3\n        ON ta.response:type::STRING = 'ResponseObject'\n       AND s3.cds_url = ta.response:url::STRING\n    WHERE ta.project = '{{project_id}}'\n      AND ta.attempted_by IS NOT NULL\n      AND ta.attempted_by != '583cf35b8b8b73054d4344e6'\n      AND (\n            NULLIF(TRIM('{{task_ids}}'), '') IS NULL\n            OR ta.task IN (\n                SELECT TRIM(f.value)\n                FROM TABLE(SPLIT_TO_TABLE(REGEXP_REPLACE('{{task_ids}}', '[\\\\s\\\\n;]+', ','), ',')) f\n                WHERE TRIM(f.value) <> ''\n            )\n          )\n    QUALIFY ROW_NUMBER() OVER (\n        PARTITION BY ta.task\n        ORDER BY ta.attempt_version DESC NULLS LAST, ta.attempted_at DESC\n    ) = 1\n),\nfiles AS (\n    SELECT\n        l.task_id,\n        l.review_level,\n        'A' AS slot,\n        d.index AS file_index,\n        d.value:name::STRING AS file_name,\n        d.value:s3Url::STRING AS s3_url,\n        d.value:mimeType::STRING AS mime_type\n    FROM latest l,\n    LATERAL FLATTEN(input => l.resp:before:\"step-TextCollection-29cf069962f8\":output:model_a_chat_download) d\n    UNION ALL\n    SELECT\n        l.task_id,\n        l.review_level,\n        'B' AS slot,\n        d.index AS file_index,\n        d.value:name::STRING AS file_name,\n        d.value:s3Url::STRING AS s3_url,\n        d.value:mimeType::STRING AS mime_type\n    FROM latest l,\n    LATERAL FLATTEN(input => l.resp:before:\"step-TextCollection-f7304e8fa411\":output:model_b_chat_download) d\n)\nSELECT\n    task_id AS \"task_id\",\n    review_level AS \"review_level\",\n    slot AS \"slot\",\n    file_index AS \"file_index\",\n    file_name AS \"file_name\",\n    s3_url AS \"s3_url\",\n    mime_type AS \"mime_type\"\nFROM files\nWHERE s3_url IS NOT NULL\n  AND LOWER(COALESCE(file_name, '')) NOT IN ('app.html', 'bscframe.html')\n  AND (\n        LOWER(COALESCE(file_name, '')) LIKE '%.html'\n        OR LOWER(COALESCE(file_name, '')) LIKE '%.mhtml'\n        OR s3_url ILIKE '%scale-cds-public%'\n      )\nORDER BY \"task_id\", \"slot\", \"file_index\"\n;"}, {"qid": 400631, "title": "Honeybee OOO \u2014 QC id list join", "url": "https://redash.scale.com/queries/400631", "params": ["project_id", "task_ids"], "purpose": "Paste QC/feedback task ids \u2192 current attempt, A/B names, final links, last attempter. No warehouse qc_validations table.", "sql": "-- Honeybee OOO \u2014 QC / feedback ID list \u2192 current attempt, A/B names, links, last attempter\n-- Grain: latest attempt per requested task_id.\n-- Paste 24-hex ids into {{task_ids}} (comma or newline). Empty list returns no rows.\n-- There is no warehouse qc_validations table \u2014 join the customer CSV ids here.\n-- Datasource 22.\n\nWITH ids AS (\n    SELECT TRIM(f.value) AS task_id\n    FROM TABLE(SPLIT_TO_TABLE(REGEXP_REPLACE('{{task_ids}}', '[\\\\s\\\\n;]+', ','), ',')) f\n    WHERE TRIM(f.value) <> ''\n),\nlatest AS (\n    SELECT\n        ta.task AS task_id,\n        ta._id AS attempt_id,\n        ta.attempted_by,\n        ta.attempted_at,\n        ta.review_level::INT AS review_level,\n        ta.review_status,\n        ta.review_outcome,\n        COALESCE(cds.respsonse, s3.s3_content, ta.response) AS resp\n    FROM public.taskattempts ta\n    JOIN ids i ON i.task_id = ta.task\n    LEFT JOIN view.cds_chat_task_attempt_responses cds\n        ON cds.task_attempt_id = ta._id\n    LEFT JOIN etl.cds_s3 s3\n        ON ta.response:type::STRING = 'ResponseObject'\n       AND s3.cds_url = ta.response:url::STRING\n    WHERE ta.project = '{{project_id}}'\n      AND ta.attempted_by != '583cf35b8b8b73054d4344e6'\n    QUALIFY ROW_NUMBER() OVER (\n        PARTITION BY ta.task\n        ORDER BY ta.attempt_version DESC NULLS LAST, ta.attempted_at DESC\n    ) = 1\n)\nSELECT\n    i.task_id AS \"task_id\",\n    l.attempt_id AS \"attempt_id\",\n    IFF(l.task_id IS NULL, 'not_in_project', 'found') AS \"row_status\",\n    l.review_level AS \"review_level\",\n    l.review_status AS \"review_status\",\n    l.review_outcome AS \"review_outcome\",\n    u.email AS \"last_attempter_email\",\n    CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', l.attempted_at::TIMESTAMP_NTZ) AS \"last_attempted_at_pt\",\n    l.resp:dataSourceResults:\"before:0:data-source-string-prefiller-646efa3f869f\":content::STRING AS \"model_a_name\",\n    l.resp:dataSourceResults:\"before:0:data-source-string-prefiller-88fdb8d4174c\":content::STRING AS \"model_b_name\",\n    COALESCE(\n        l.resp:before:\"step-TextCollection-29cf069962f8\":output:gemini_final_trajectory_a::STRING,\n        l.resp:before:\"step-TextCollection-29cf069962f8\":output:gemini_0_trajectory_link::STRING,\n        l.resp:before:\"step-TextCollection-29cf069962f8\":output:model_a_link::STRING,\n        l.resp:before:\"step-TextCollection-29cf069962f8\":output:field_4::STRING\n    ) AS \"link_a\",\n    COALESCE(\n        l.resp:before:\"step-TextCollection-f7304e8fa411\":output:gemini_final_trajectory_b::STRING,\n        l.resp:before:\"step-TextCollection-f7304e8fa411\":output:model_b_link::STRING,\n        l.resp:before:\"step-TextCollection-f7304e8fa411\":output:gpt_trajectory_link::STRING,\n        l.resp:before:\"step-TextCollection-f7304e8fa411\":output:gpt_trajectory_b::STRING\n    ) AS \"link_b\"\nFROM ids i\nLEFT JOIN latest l ON l.task_id = i.task_id\nLEFT JOIN public.users u ON u._id = l.attempted_by\nORDER BY \"row_status\", \"task_id\"\n;"}, {"qid": 400632, "title": "Honeybee OOO \u2014 last 7d actives + weekly quality", "url": "https://redash.scale.com/queries/400632", "params": ["project_id"], "purpose": "Daily active attempters (PT, attempt-level -1, no scale email) plus weekly quality-score rollup. No PWI table exists.", "sql": "-- Honeybee OOO \u2014 last 7 PT days: daily actives + review outcomes + weekly quality\n-- Two grains, labeled:\n--   (1) Daily active attempters = unique CBs who tasked that PT day (attempt-level -1)\n--   (2) Weekly quality from view.contributor_project_weekly_quality_score (no PWI table)\n-- There is no warehouse pass_with_issues table. Local eval CSVs used task_id,verdict.\n-- Filters: bot + NOT email ILIKE '%scale%' (drops contractors.scale.com too).\n-- Datasource 22. Timezone America/Los_Angeles.\n\nWITH days AS (\n    SELECT\n        CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', ta.attempted_at::TIMESTAMP_NTZ)::DATE AS day_pt,\n        ta.attempted_by,\n        ta.task,\n        ta.review_outcome\n    FROM public.taskattempts ta\n    JOIN public.users u ON u._id = ta.attempted_by\n    WHERE ta.project = '{{project_id}}'\n      AND ta.attempted_by IS NOT NULL\n      AND ta.attempted_by != '583cf35b8b8b73054d4344e6'\n      AND ta.attempted_at_review_level::INT = -1\n      AND NOT u.email ILIKE '%scale%'\n      AND CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', ta.attempted_at::TIMESTAMP_NTZ)::DATE\n          >= CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', CURRENT_TIMESTAMP())::DATE - 7\n),\ndaily AS (\n    SELECT\n        day_pt,\n        COUNT(DISTINCT attempted_by) AS daily_active_attempters,\n        COUNT(DISTINCT task) AS tasks_touched,\n        COUNT(*) AS attempts,\n        COUNT_IF(review_outcome = 'accepted') AS accepted,\n        COUNT_IF(review_outcome = 'fixed') AS fixed,\n        COUNT_IF(review_outcome = 'rejected') AS rejected\n    FROM days\n    GROUP BY 1\n),\nquality AS (\n    SELECT\n        q.week,\n        COUNT(*) AS worker_rows,\n        ROUND(AVG(q.final_score), 1) AS avg_final_score,\n        COUNT_IF(q.worker_performance_category = 'good') AS n_good,\n        COUNT_IF(q.worker_performance_category = 'above average') AS n_above_average,\n        COUNT_IF(q.worker_performance_category = 'below average') AS n_below_average,\n        COUNT_IF(q.worker_performance_category = 'bad') AS n_bad\n    FROM view.contributor_project_weekly_quality_score q\n    WHERE q.project_id = '{{project_id}}'\n      AND q.week >= DATEADD(\n            'week', -2,\n            CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', CURRENT_TIMESTAMP())::DATE\n          )\n    GROUP BY 1\n)\nSELECT\n    d.day_pt AS \"day_pt\",\n    d.daily_active_attempters AS \"daily_active_attempters\",\n    d.tasks_touched AS \"tasks_touched\",\n    d.attempts AS \"attempts\",\n    d.accepted AS \"accepted\",\n    d.fixed AS \"fixed\",\n    d.rejected AS \"rejected\",\n    q.week AS \"quality_week\",\n    q.avg_final_score AS \"avg_final_score\",\n    q.n_good AS \"quality_good\",\n    q.n_above_average AS \"quality_above_average\",\n    q.n_below_average AS \"quality_below_average\",\n    q.n_bad AS \"quality_bad\"\nFROM daily d\nLEFT JOIN quality q\n    ON q.week = DATE_TRUNC('week', d.day_pt)\nORDER BY \"day_pt\"\n;"}, {"qid": 400633, "title": "Honeybee OOO \u2014 delivery-preview extract", "url": "https://redash.scale.com/queries/400633", "params": ["project_id", "task_ids"], "purpose": "task_id, model_a_name, model_b_name, link_a, link_b, html_s3_a, html_s3_b from latest attempt.", "sql": "-- Honeybee OOO \u2014 delivery-preview extract\n-- Grain: latest attempt per task. Columns match the sender-preview sheet:\n-- task_id, model_a_name, model_b_name, link_a, link_b (+ HTML S3 fill-ins).\n-- Datasource 22.\n\nWITH latest AS (\n    SELECT\n        ta.task AS task_id,\n        ta.review_level::INT AS review_level,\n        COALESCE(cds.respsonse, s3.s3_content, ta.response) AS resp\n    FROM public.taskattempts ta\n    LEFT JOIN view.cds_chat_task_attempt_responses cds\n        ON cds.task_attempt_id = ta._id\n    LEFT JOIN etl.cds_s3 s3\n        ON ta.response:type::STRING = 'ResponseObject'\n       AND s3.cds_url = ta.response:url::STRING\n    WHERE ta.project = '{{project_id}}'\n      AND ta.attempted_by IS NOT NULL\n      AND ta.attempted_by != '583cf35b8b8b73054d4344e6'\n      AND (\n            NULLIF(TRIM('{{task_ids}}'), '') IS NULL\n            OR ta.task IN (\n                SELECT TRIM(f.value)\n                FROM TABLE(SPLIT_TO_TABLE(REGEXP_REPLACE('{{task_ids}}', '[\\\\s\\\\n;]+', ','), ',')) f\n                WHERE TRIM(f.value) <> ''\n            )\n          )\n    QUALIFY ROW_NUMBER() OVER (\n        PARTITION BY ta.task\n        ORDER BY ta.attempt_version DESC NULLS LAST, ta.attempted_at DESC\n    ) = 1\n),\nhtml_a AS (\n    SELECT\n        l.task_id,\n        d.value:s3Url::STRING AS html_s3_a\n    FROM latest l,\n    LATERAL FLATTEN(input => l.resp:before:\"step-TextCollection-29cf069962f8\":output:model_a_chat_download) d\n    WHERE d.value:s3Url IS NOT NULL\n      AND LOWER(COALESCE(d.value:name::STRING, '')) NOT IN ('app.html', 'bscframe.html')\n    QUALIFY ROW_NUMBER() OVER (PARTITION BY l.task_id ORDER BY d.index) = 1\n),\nhtml_b AS (\n    SELECT\n        l.task_id,\n        d.value:s3Url::STRING AS html_s3_b\n    FROM latest l,\n    LATERAL FLATTEN(input => l.resp:before:\"step-TextCollection-f7304e8fa411\":output:model_b_chat_download) d\n    WHERE d.value:s3Url IS NOT NULL\n      AND LOWER(COALESCE(d.value:name::STRING, '')) NOT IN ('app.html', 'bscframe.html')\n    QUALIFY ROW_NUMBER() OVER (PARTITION BY l.task_id ORDER BY d.index) = 1\n)\nSELECT\n    l.task_id AS \"task_id\",\n    l.review_level AS \"review_level\",\n    l.resp:dataSourceResults:\"before:0:data-source-string-prefiller-646efa3f869f\":content::STRING AS \"model_a_name\",\n    l.resp:dataSourceResults:\"before:0:data-source-string-prefiller-88fdb8d4174c\":content::STRING AS \"model_b_name\",\n    COALESCE(\n        l.resp:before:\"step-TextCollection-29cf069962f8\":output:gemini_final_trajectory_a::STRING,\n        l.resp:before:\"step-TextCollection-29cf069962f8\":output:gemini_0_trajectory_link::STRING,\n        l.resp:before:\"step-TextCollection-29cf069962f8\":output:model_a_link::STRING,\n        l.resp:before:\"step-TextCollection-29cf069962f8\":output:field_4::STRING,\n        ha.html_s3_a\n    ) AS \"link_a\",\n    COALESCE(\n        l.resp:before:\"step-TextCollection-f7304e8fa411\":output:gemini_final_trajectory_b::STRING,\n        l.resp:before:\"step-TextCollection-f7304e8fa411\":output:model_b_link::STRING,\n        l.resp:before:\"step-TextCollection-f7304e8fa411\":output:gpt_trajectory_link::STRING,\n        l.resp:before:\"step-TextCollection-f7304e8fa411\":output:gpt_trajectory_b::STRING,\n        hb.html_s3_b\n    ) AS \"link_b\",\n    ha.html_s3_a AS \"html_s3_a\",\n    hb.html_s3_b AS \"html_s3_b\"\nFROM latest l\nLEFT JOIN html_a ha ON ha.task_id = l.task_id\nLEFT JOIN html_b hb ON hb.task_id = l.task_id\nORDER BY \"review_level\", \"task_id\"\n;"}, {"qid": 400634, "title": "Honeybee OOO \u2014 L8 vs L10 leftovers", "url": "https://redash.scale.com/queries/400634", "params": ["project_id", "exclude_ids"], "purpose": "Pending gen_ai_work L8 then L10. Never L12. Paste prior audit/fixer ids as exclude_ids. Do not requeue L12.", "sql": "-- Honeybee OOO \u2014 L8 leftover vs L10 leftover (never L12)\n-- Grain: latest view.gen_ai_work row per pending task (sibling of campaign\n-- honeybee-qc::l10-sample queries). Current queue = current_review_level.\n-- Prior audit artifacts are local files (audit_runs/, honeybee_fixer_to_send/).\n-- There is no warehouse table for those IDs \u2014 paste them into {{exclude_ids}}.\n-- L8 sorts before L10. L12 is excluded. Do not requeue L12.\n-- Datasource 22.\n\nWITH excluded AS (\n    SELECT TRIM(f.value) AS task_id\n    FROM TABLE(SPLIT_TO_TABLE(REGEXP_REPLACE('{{exclude_ids}}', '[\\\\s\\\\n;]+', ','), ',')) f\n    WHERE TRIM(f.value) <> ''\n),\nlatest AS (\n    SELECT\n        w.task_id,\n        w.current_review_level::INT AS review_level,\n        w.task_status,\n        w.work_time,\n        w.worker,\n        w.email\n    FROM view.gen_ai_work w\n    WHERE w.project_id = '{{project_id}}'\n      AND w.task_status = 'pending'\n      AND w.current_review_level::INT IN (8, 10)\n      AND w.task_id IS NOT NULL\n    QUALIFY ROW_NUMBER() OVER (\n        PARTITION BY w.task_id\n        ORDER BY w.work_time DESC NULLS LAST, w.task_last_touched_timestamp DESC NULLS LAST\n    ) = 1\n)\nSELECT\n    l.task_id AS \"task_id\",\n    l.review_level AS \"review_level\",\n    IFF(l.review_level = 8, 'L8 leftover', 'L10 leftover') AS \"queue\",\n    l.task_status AS \"task_status\",\n    l.email AS \"last_worker_email\",\n    CONVERT_TIMEZONE('UTC', 'America/Los_Angeles', l.work_time::TIMESTAMP_NTZ) AS \"last_work_pt\"\nFROM latest l\nLEFT JOIN excluded e ON e.task_id = l.task_id\nWHERE e.task_id IS NULL\nORDER BY IFF(l.review_level = 8, 0, 1), l.task_id\n;"}, {"qid": 400635, "title": "Honeybee OOO \u2014 turn_link_a / turn_link_b presence", "url": "https://redash.scale.com/queries/400635", "params": ["project_id"], "purpose": "How many latest tasks have L1 SxS turn-manifest share links on A and B.", "sql": "-- Honeybee OOO \u2014 turn-manifest / turn_link_a / turn_link_b presence\n-- Grain: latest attempt per task, then counts of populated turn links.\n-- L1 SxS manifests (projects.py HONEYBEE_L1_SXS):\n--   A step-RubricCriteriaBuilder-da9bb8c86eab  annotations.turn_link_a\n--   B step-RubricCriteriaBuilder-0e4891d4e48f  annotations.turn_link_b\n-- Datasource 22.\n\nWITH latest AS (\n    SELECT\n        ta.task AS task_id,\n        ta.review_level::INT AS review_level,\n        COALESCE(cds.respsonse, s3.s3_content, ta.response) AS resp\n    FROM public.taskattempts ta\n    LEFT JOIN view.cds_chat_task_attempt_responses cds\n        ON cds.task_attempt_id = ta._id\n    LEFT JOIN etl.cds_s3 s3\n        ON ta.response:type::STRING = 'ResponseObject'\n       AND s3.cds_url = ta.response:url::STRING\n    WHERE ta.project = '{{project_id}}'\n      AND ta.attempted_by IS NOT NULL\n      AND ta.attempted_by != '583cf35b8b8b73054d4344e6'\n    QUALIFY ROW_NUMBER() OVER (\n        PARTITION BY ta.task\n        ORDER BY ta.attempt_version DESC NULLS LAST, ta.attempted_at DESC\n    ) = 1\n),\nturns AS (\n    SELECT\n        l.task_id,\n        l.review_level,\n        'A' AS slot,\n        ca.value:annotations:turn_number_a::STRING AS turn_number,\n        NULLIF(TRIM(ca.value:annotations:turn_link_a::STRING), '') AS turn_link\n    FROM latest l,\n    LATERAL FLATTEN(input => l.resp:before:\"step-RubricCriteriaBuilder-da9bb8c86eab\":output:criteria) ca\n    UNION ALL\n    SELECT\n        l.task_id,\n        l.review_level,\n        'B' AS slot,\n        cb.value:annotations:turn_number_b::STRING AS turn_number,\n        NULLIF(TRIM(cb.value:annotations:turn_link_b::STRING), '') AS turn_link\n    FROM latest l,\n    LATERAL FLATTEN(input => l.resp:before:\"step-RubricCriteriaBuilder-0e4891d4e48f\":output:criteria) cb\n),\nper_task AS (\n    SELECT\n        task_id,\n        review_level,\n        COUNT_IF(slot = 'A') AS manifest_rows_a,\n        COUNT_IF(slot = 'B') AS manifest_rows_b,\n        COUNT_IF(slot = 'A' AND turn_link IS NOT NULL) AS turn_link_a_n,\n        COUNT_IF(slot = 'B' AND turn_link IS NOT NULL) AS turn_link_b_n\n    FROM turns\n    GROUP BY 1, 2\n)\nSELECT\n    review_level AS \"review_level\",\n    COUNT(*) AS \"tasks_with_any_manifest\",\n    COUNT_IF(turn_link_a_n > 0) AS \"tasks_with_turn_link_a\",\n    COUNT_IF(turn_link_b_n > 0) AS \"tasks_with_turn_link_b\",\n    COUNT_IF(turn_link_a_n > 0 AND turn_link_b_n > 0) AS \"tasks_with_both_turn_links\",\n    COUNT_IF(manifest_rows_a > 0 AND turn_link_a_n = 0) AS \"manifest_a_no_links\",\n    COUNT_IF(manifest_rows_b > 0 AND turn_link_b_n = 0) AS \"manifest_b_no_links\",\n    ROUND(AVG(turn_link_a_n), 1) AS \"avg_turn_link_a\",\n    ROUND(AVG(turn_link_b_n), 1) AS \"avg_turn_link_b\"\nFROM per_task\nGROUP BY 1\nORDER BY 1\n;"}, {"qid": 400636, "title": "Honeybee OOO \u2014 link search (field_4 / chat_download / shares)", "url": "https://redash.scale.com/queries/400636", "params": ["project_id", "task_ids"], "purpose": "Flatten every HTTP-looking run-step field and chat_download s3Url on the latest attempt.", "sql": "-- Honeybee OOO \u2014 link search over run-step fields\n-- Grain: one row per (task, slot, field) URL on the latest attempt.\n-- Searches field_4, *trajectory*, model_*_link, model_*_chat_download s3Url,\n-- gemini_final, and any leftover http string on the A/B run steps.\n-- Drops app.html / bscframe.html. Datasource 22.\n\nWITH latest AS (\n    SELECT\n        ta.task AS task_id,\n        ta.review_level::INT AS review_level,\n        COALESCE(cds.respsonse, s3.s3_content, ta.response) AS resp\n    FROM public.taskattempts ta\n    LEFT JOIN view.cds_chat_task_attempt_responses cds\n        ON cds.task_attempt_id = ta._id\n    LEFT JOIN etl.cds_s3 s3\n        ON ta.response:type::STRING = 'ResponseObject'\n       AND s3.cds_url = ta.response:url::STRING\n    WHERE ta.project = '{{project_id}}'\n      AND ta.attempted_by IS NOT NULL\n      AND ta.attempted_by != '583cf35b8b8b73054d4344e6'\n      AND (\n            NULLIF(TRIM('{{task_ids}}'), '') IS NULL\n            OR ta.task IN (\n                SELECT TRIM(f.value)\n                FROM TABLE(SPLIT_TO_TABLE(REGEXP_REPLACE('{{task_ids}}', '[\\\\s\\\\n;]+', ','), ',')) f\n                WHERE TRIM(f.value) <> ''\n            )\n          )\n    QUALIFY ROW_NUMBER() OVER (\n        PARTITION BY ta.task\n        ORDER BY ta.attempt_version DESC NULLS LAST, ta.attempted_at DESC\n    ) = 1\n),\nkv AS (\n    SELECT\n        l.task_id,\n        l.review_level,\n        'A' AS slot,\n        f.key::STRING AS field_name,\n        f.value::STRING AS raw_value\n    FROM latest l,\n    LATERAL FLATTEN(input => l.resp:before:\"step-TextCollection-29cf069962f8\":output) f\n    WHERE TYPEOF(f.value) = 'VARCHAR'\n      AND f.value::STRING ILIKE '%http%'\n    UNION ALL\n    SELECT\n        l.task_id,\n        l.review_level,\n        'B' AS slot,\n        f.key::STRING AS field_name,\n        f.value::STRING AS raw_value\n    FROM latest l,\n    LATERAL FLATTEN(input => l.resp:before:\"step-TextCollection-f7304e8fa411\":output) f\n    WHERE TYPEOF(f.value) = 'VARCHAR'\n      AND f.value::STRING ILIKE '%http%'\n    UNION ALL\n    SELECT\n        l.task_id,\n        l.review_level,\n        'A' AS slot,\n        CONCAT('model_a_chat_download:', COALESCE(d.value:name::STRING, d.index::STRING)) AS field_name,\n        d.value:s3Url::STRING AS raw_value\n    FROM latest l,\n    LATERAL FLATTEN(input => l.resp:before:\"step-TextCollection-29cf069962f8\":output:model_a_chat_download) d\n    WHERE d.value:s3Url IS NOT NULL\n      AND LOWER(COALESCE(d.value:name::STRING, '')) NOT IN ('app.html', 'bscframe.html')\n    UNION ALL\n    SELECT\n        l.task_id,\n        l.review_level,\n        'B' AS slot,\n        CONCAT('model_b_chat_download:', COALESCE(d.value:name::STRING, d.index::STRING)) AS field_name,\n        d.value:s3Url::STRING AS raw_value\n    FROM latest l,\n    LATERAL FLATTEN(input => l.resp:before:\"step-TextCollection-f7304e8fa411\":output:model_b_chat_download) d\n    WHERE d.value:s3Url IS NOT NULL\n      AND LOWER(COALESCE(d.value:name::STRING, '')) NOT IN ('app.html', 'bscframe.html')\n)\nSELECT\n    task_id AS \"task_id\",\n    review_level AS \"review_level\",\n    slot AS \"slot\",\n    field_name AS \"field_name\",\n    raw_value AS \"url\",\n    CASE\n        WHEN raw_value ILIKE '%gemini.google.com/share/%' OR raw_value ILIKE '%share.gemini.google/%' THEN 'gemini_share'\n        WHEN raw_value ILIKE '%chatgpt.com/share/%' OR raw_value ILIKE '%chatgpt.com/s/%' THEN 'gpt_share'\n        WHEN raw_value ILIKE '%claude.ai/share/%' THEN 'claude_share'\n        WHEN raw_value ILIKE '%scale-cds-public%' THEN 'html_s3'\n        WHEN raw_value ILIKE '%/app/%' OR raw_value ILIKE '%chatgpt.com/c/%' THEN 'private'\n        ELSE 'other'\n    END AS \"link_class\"\nFROM kv\nWHERE raw_value ILIKE '%http%'\nORDER BY \"task_id\", \"slot\", \"field_name\"\n;"}, {"qid": 400637, "title": "Honeybee OOO \u2014 review-level distribution", "url": "https://redash.scale.com/queries/400637", "params": ["project_id"], "purpose": "Sanity counts of latest-attempt review_level \u00d7 attempted_at_review_level \u00d7 review_status.", "sql": "-- Honeybee OOO \u2014 review-level distribution (sanity before leftover / campaign picks)\n-- Grain: latest attempt per task, then counts by current review_level.\n-- Also shows attempted_at_review_level on those same latest rows.\n-- Datasource 22. Run this before assuming L8/L10/-1 mappings.\n\nWITH latest AS (\n    SELECT\n        ta.task AS task_id,\n        ta.review_level::INT AS review_level,\n        ta.attempted_at_review_level::INT AS attempted_at_review_level,\n        ta.review_status,\n        ta.review_outcome\n    FROM public.taskattempts ta\n    WHERE ta.project = '{{project_id}}'\n      AND ta.attempted_by IS NOT NULL\n      AND ta.attempted_by != '583cf35b8b8b73054d4344e6'\n    QUALIFY ROW_NUMBER() OVER (\n        PARTITION BY ta.task\n        ORDER BY ta.attempt_version DESC NULLS LAST, ta.attempted_at DESC\n    ) = 1\n)\nSELECT\n    review_level AS \"review_level\",\n    attempted_at_review_level AS \"attempted_at_review_level\",\n    review_status AS \"review_status\",\n    COUNT(*) AS \"tasks\",\n    COUNT_IF(review_outcome = 'accepted') AS \"accepted\",\n    COUNT_IF(review_outcome = 'fixed') AS \"fixed\",\n    COUNT_IF(review_outcome = 'rejected') AS \"rejected\"\nFROM latest\nGROUP BY 1, 2, 3\nORDER BY 1, 2, 3\n;"}];
+const Q = Object.fromEntries(CATALOG.map(q => [q.qid, q]));
+const UPLOAD_COLS = ["og_task_id","universe","prompt_id","CUJ","task_type","opening_prompt","input_paths","input_uploads",
+  "target_deliverables","rubric_criteria","model_a_name","model_b_name","model_c_name","model_d_name",
+  "demo_email","demo_password","demo_email_b","demo_password_b","environment_context","estimated_turns","credential_mode","languageCode"];
+const A_FIELDS = ["field_4","gemini_final_trajectory_a","gemini_0_trajectory_link","model_a_link"];
+const B_FIELDS = ["gemini_final_trajectory_b","model_b_link","gpt_trajectory_link"];
+const JUNK_HTML = ["app.html","bscframe.html"];
+
+/* ============================== CSV ============================== */
+function parseCSV(text){
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  const rows=[]; let row=[], f="", i=0, q=false; const n=text.length;
+  while(i<n){
+    const c=text[i];
+    if(q){
+      if(c==='"'){ if(text[i+1]==='"'){f+='"';i+=2;continue;} q=false;i++;continue; }
+      f+=c;i++;continue;
+    }
+    if(c==='"'){q=true;i++;continue;}
+    if(c===','){row.push(f);f="";i++;continue;}
+    if(c==='\r'){i++;continue;}
+    if(c==='\n'){row.push(f);rows.push(row);row=[];f="";i++;continue;}
+    f+=c;i++;
+  }
+  if(f!==""||row.length){row.push(f);rows.push(row);}
+  while(rows.length && rows[rows.length-1].length===1 && rows[rows.length-1][0]==="") rows.pop();
+  const headers=(rows.shift()||[]).map(h=>h.trim());
+  const objs=rows.map(r=>{const o={};headers.forEach((h,k)=>{o[h]=r[k]!==undefined?r[k]:"";});return o;});
+  return {headers, rows:objs};
+}
+function csvCell(v){v=v==null?"":String(v);return /[",\r\n]/.test(v)||/^\s|\s$/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+function toCSV(headers, rows){
+  const out=[headers.map(csvCell).join(",")];
+  for(const r of rows) out.push(headers.map(h=>csvCell(r[h])).join(","));
+  return out.join("\r\n")+"\r\n";
+}
+function taskId(row){for(const k of ID_KEYS){const v=(row[k]||"").trim().toLowerCase(); if(v) return v;} return "";}
+function parseIds(text){const seen=new Set(),out=[];for(const m of (text||"").match(HEX24)||[]){const t=m.toLowerCase(); if(!seen.has(t)){seen.add(t);out.push(t);}} return out;}
+function ymd(){const d=new Date();return d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0");}
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function download(name, text, type="text/csv"){const b=new Blob([text],{type:type+";charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
+async function copy(text, btn){try{await navigator.clipboard.writeText(text);}catch(e){const t=document.createElement("textarea");t.value=text;document.body.appendChild(t);t.select();document.execCommand("copy");t.remove();}
+  if(btn){const s=document.createElement("span");s.className="copied";s.textContent="copied";btn.after(s);setTimeout(()=>s.remove(),1400);}}
+async function readFile(file){
+  if(file.size>400*1024*1024) throw new Error(`${file.name} is ${(file.size/1048576).toFixed(0)} MB. The browser can't hold that. Use scripts/filter_ids.py on the big preview first, then load the result here.`);
+  return await file.text();
+}
+const store={get(k,d=""){try{return localStorage.getItem("hb_"+k)??d;}catch(e){return d;}},set(k,v){try{localStorage.setItem("hb_"+k,v);}catch(e){}}};
+
+/* ============================== link classifier ============================== */
+// Structural only (no HTTP), mirrors honeybee_qc/links.py classify_link + q400629/400636.
+function classifyLink(url){
+  const u=(url||"").trim();
+  if(!u || /^(n\/?a|none|null|-)$/i.test(u)) return "missing";
+  if(!/^https?:\/\//i.test(u)) return u.startsWith("scale-cds://")?"private_s3":"missing";
+  const l=u.toLowerCase();
+  if(l.includes("cursor.com/dashboard/shared-chats")) return "not_honeybee_host";
+  if(l.includes("gemini.google.com/share/")||l.includes("share.gemini.google/")) return "gemini_share";
+  if(/chatgpt\.com\/(share|s)\/|chat\.openai\.com\/(share|s)\//.test(l)) return "gpt_share";
+  if(l.includes("claude.ai/share/")) return "claude_share";
+  if(l.includes("scale-cds-public-us-west-2")||l.includes("scale-cds-public")) return "html_s3";
+  if(/\/c\/|\/app\/|\/chat\//.test(l)) return "private";
+  return "unrecognised";
+}
+const SHARE = new Set(["gemini_share","gpt_share","claude_share"]);
+function isShare(c){return SHARE.has(c);}
+function isSendable(c){return isShare(c)||c==="html_s3";}
+function pillFor(c){
+  const map={gemini_share:"ok",gpt_share:"ok",claude_share:"ok",share_ok:"ok",html_s3:"ok",missing:"bad",missing_share:"bad",private:"bad",private_not_share:"bad",private_s3:"bad",not_honeybee_host:"bad",unrecognised:"warn",unrecognised_host:"warn"};
+  return `<span class="pill ${map[c]||"mut"}">${esc(c)}</span>`;
+}
+function shareKey(u){const m=(u||"").match(/\/(?:share|s)\/([A-Za-z0-9_-]{6,})/);return m?m[1]:"";}
+
+/* ============================== table rendering ============================== */
+function renderTable(el, headers, rows, opts={}){
+  const lim=opts.limit??300, fmt=opts.fmt||{};
+  const shown=rows.slice(0,lim);
+  let h=`<div class="tw"><table><thead><tr>${headers.map(x=>`<th>${esc(x)}</th>`).join("")}</tr></thead><tbody>`;
+  for(const r of shown){h+="<tr>"+headers.map(x=>{let v=r[x];if(fmt[x]) return `<td>${fmt[x](v,r)}</td>`;v=v==null?"":String(v);
+    if(/^https?:\/\//.test(v)) return `<td><a href="${esc(v)}" target="_blank" rel="noopener">${esc(v.length>90?v.slice(0,90)+"…":v)}</a></td>`;
+    return `<td>${esc(v.length>220?v.slice(0,220)+"…":v)}</td>`;}).join("")+"</tr>";}
+  h+="</tbody></table></div>";
+  if(rows.length>lim) h+=`<div class="lede" style="margin-top:6px">Showing ${lim} of ${rows.length} rows. Download for the full set.</div>`;
+  el.innerHTML=h;
+}
+function stats(el, items){el.innerHTML=`<div class="stats">${items.map(([v,l])=>`<div class="stat"><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join("")}</div>`;}
+
+/* ============================== Redash (local proxy only) ============================== */
+let PROXY=false, PROXY_WHY="checking";
+async function detectProxy(){
+  const c=document.getElementById("conn");
+  if(!/^https?:$/.test(location.protocol)){PROXY_WHY="file";c.textContent="Redash: offline (file://) · CSV mode";c.className="badge off";return;}
+  try{const r=await fetch("/api/health",{cache:"no-store"});const j=await r.json();
+    PROXY=!!(j.ok&&j.key_loaded);PROXY_WHY=PROXY?"ok":"nokey";
+    c.textContent=PROXY?"Redash: connected via local proxy":"Redash: proxy up, no key loaded · CSV mode";c.className="badge "+(PROXY?"on":"off");
+  }catch(e){PROXY_WHY="noserver";c.textContent="Redash: not connected · CSV mode";c.className="badge off";}
+  document.querySelectorAll("[data-run]").forEach(b=>b.classList.toggle("off",!PROXY));
+}
+async function runRedash(qid, params, statusEl){
+  const body={qid, params:{project_id:PROJECT_ID, ...params}};
+  const r=await fetch("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const j=await r.json();
+  if(!r.ok||j.error) throw new Error(j.error||("HTTP "+r.status));
+  return {headers:j.columns, rows:j.rows.map(row=>Object.fromEntries(j.columns.map((c,k)=>[c,row[k]==null?"":String(row[k])])))};
+}
+
+/* Source widget: Run on Redash (proxy) · upload CSV export · paste CSV */
+function sourceWidget(host, qid, opts={}){
+  const q=Q[qid]; const wrap=document.createElement("div"); wrap.className="src";
+  const needsIds=q.params.includes("task_ids"), needsEx=q.params.includes("exclude_ids");
+  wrap.innerHTML=`<div class="row" style="justify-content:space-between"><div><span class="t">q ${qid}</span> · ${esc(q.title.replace("Honeybee OOO — ",""))}
+    <div class="s">${esc(q.purpose)} <a href="${q.url}" target="_blank" rel="noopener">open in Redash ↗</a></div></div>
+    <span class="pill mut" data-st>no data</span></div>
+    <div class="row" style="margin-top:8px">
+      <button class="b p off" data-run title="Needs the local server (honeybee_viewer_server.py)">Run on Redash</button>
+      <label class="b" style="cursor:pointer">Upload CSV export<input type="file" accept=".csv" hidden data-file></label>
+      <button class="b" data-pastebtn>Paste CSV</button>
+      ${needsIds?`<span class="s">uses task_ids from ${esc(opts.idsLabel||"the id box on this screen")}</span>`:""}
+      ${needsEx?`<span class="s">uses exclude_ids from this screen</span>`:""}
+    </div>
+    <details class="howto" ${PROXY?"":"open"}><summary>How do I get this data?</summary>
+      <p style="margin:6px 0 2px"><b>Option 1, Run on Redash</b> (only when the page is opened from the local server, <code>python3 honeybee_viewer_server.py</code>): click the purple button and wait. Big queries can take a few minutes.</p>
+      <p style="margin:8px 0 2px"><b>Option 2, download it yourself</b> (works anywhere):</p>
+      <ol><li>Click <a href="${q.url}" target="_blank" rel="noopener">open q ${qid} in Redash ↗</a>.</li>
+      <li>Check the parameter <code>project_id</code> is <code>6a567b80aaa4d140131eae6c</code> <button class="b" data-cpproj style="padding:1px 8px">copy</button></li>
+      ${needsIds?`<li>Paste ids into <code>task_ids</code> as commas, no quotes <button class="b" data-cpids style="padding:1px 8px">copy ids from this screen</button>${qid===400631?" (required: an empty list returns no rows)":" (leave blank for the whole project, slower)"}</li>`:""}
+      ${needsEx?`<li>Paste ids into <code>exclude_ids</code> as commas, no quotes <button class="b" data-cpex style="padding:1px 8px">copy exclude_ids from this screen</button></li>`:""}
+      <li>Datasource must be <b>22</b>. Click <b>Execute</b> and wait for the result table.</li>
+      <li>Under the results, open the <b>⋮</b> / Download menu → <b>Download as CSV File</b>.</li>
+      <li>Come back here and click <b>Upload CSV export</b> (or drag the file onto it). The status pill turns green with the row count.</li></ol>
+      <p style="margin:8px 0 2px"><b>Option 3, Paste CSV</b>: if someone sent you the CSV text, click Paste CSV, paste it, then Use pasted CSV.</p>
+    </details>
+    <div data-paste style="display:none;margin-top:8px"><textarea placeholder="Paste the Redash CSV export here"></textarea><button class="b" data-usepaste>Use pasted CSV</button></div>`;
+  host.appendChild(wrap);
+  const cp=(sel,fn)=>{const x=wrap.querySelector(sel);if(x) x.onclick=e=>{e.preventDefault();const v=fn();if(!v){alert("Nothing to copy yet. Fill the id box / load the file on this screen first.");return;}copy(v,x);};};
+  cp("[data-cpproj]",()=>PROJECT_ID);cp("[data-cpids]",()=>(opts.getIds?opts.getIds():[]).join(","));cp("[data-cpex]",()=>(opts.getExclude?opts.getExclude():[]).join(","));
+  const st=wrap.querySelector("[data-st]");
+  const done=(d,how)=>{st.className="pill ok";st.textContent=`${d.rows.length} rows · ${how}`;opts.onLoad&&opts.onLoad(d);};
+  const fail=e=>{st.className="pill bad";st.textContent="error";alert(`q ${qid}: ${e.message}`);};
+  wrap.querySelector("[data-run]").onclick=async()=>{
+    if(!PROXY){alert({
+      file:"Run on Redash doesn't work when the page is opened by double-clicking the file (the address bar starts with file://).\n\nFix:\n1. Open Terminal.\n2. cd into honeybee_qc/ooo_handoff/viewer\n3. Run: python3 honeybee_viewer_server.py\n4. Open http://127.0.0.1:8765 in your browser (not the file).\n\nOr use Upload CSV export: steps are under “How do I get this data?”.",
+      nokey:"The local server is running but it has no Redash key.\n\nFix: stop the server (Ctrl+C), then either\n• add a line REDASH_API_KEY=<your key> to ~/.cursor/redash.env, or\n• run: REDASH_API_KEY=<your key> python3 honeybee_viewer_server.py\n\nThen reload this page. Never paste the key into this page.",
+      noserver:"This page can't reach the local server. Start it with python3 honeybee_viewer_server.py and open http://127.0.0.1:8765 (same port the server prints).",
+      checking:"Still checking the connection. Try again in a second."}[PROXY_WHY]||"Redash isn't connected.");return;}
+    const p={}; if(needsIds){const ids=opts.getIds?opts.getIds():[]; if(qid===400631&&!ids.length){alert("400631 needs task ids (empty list returns no rows).");return;} p.task_ids=ids.join(",");}
+    if(needsEx) p.exclude_ids=(opts.getExclude?opts.getExclude():[]).join(",");
+    st.className="pill warn";st.textContent="running on Redash…";
+    try{done(await runRedash(qid,p),"Redash");}catch(e){fail(e);}
+  };
+  wrap.querySelector("[data-file]").onchange=async e=>{const f=e.target.files[0];if(!f)return;try{done(parseCSV(await readFile(f)),f.name);}catch(err){fail(err);}};
+  wrap.querySelector("[data-pastebtn]").onclick=()=>{const p=wrap.querySelector("[data-paste]");p.style.display=p.style.display==="none"?"block":"none";};
+  wrap.querySelector("[data-usepaste]").onclick=()=>{const t=wrap.querySelector("[data-paste] textarea").value;if(!t.trim())return;done(parseCSV(t),"pasted");};
+  if(PROXY) wrap.querySelector("[data-run]").classList.remove("off");
+  return wrap;
+}
+
+/* Drop zone */
+function dropZone(host, label, {multiple=false, accept=".csv", onFiles}){
+  const d=document.createElement("label"); d.className="drop";
+  d.innerHTML=`<span class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 20h14"/></svg></span>${label}<input type="file" ${multiple?"multiple":""} accept="${accept}">`;
+  const inp=d.querySelector("input");
+  inp.onchange=()=>{onFiles([...inp.files]);inp.value="";};
+  d.ondragover=e=>{e.preventDefault();d.classList.add("over");};
+  d.ondragleave=()=>d.classList.remove("over");
+  d.ondrop=e=>{e.preventDefault();d.classList.remove("over");onFiles([...e.dataTransfer.files]);};
+  host.appendChild(d); return d;
+}
+
+/* Merge core (scripts/merge_csvs.py): unique task_id, later wins, new columns appended */
+function mergeTables(tables, {keepEarlierWhenBlank=false}={}){
+  const cols=[], seen=new Set(), byId=new Map(); let overwritten=0, read=0, noId=0;
+  for(const t of tables){
+    for(const c of t.headers) if(!seen.has(c)){seen.add(c);cols.push(c);}
+    for(const row of t.rows){read++;
+      const id=taskId(row); if(!id){noId++;continue;}
+      if(!byId.has(id)) byId.set(id,{}); else overwritten++;
+      const tgt=byId.get(id);
+      for(const [k,v] of Object.entries(row)){ if(keepEarlierWhenBlank && (v==null||v==="") && tgt[k]) continue; tgt[k]=v??""; }
+      tgt.task_id=id;
+    }
+  }
+  if(!seen.has("task_id")) cols.unshift("task_id");
+  return {headers:cols, rows:[...byId.values()], read, overwritten, noId};
+}
+
+/* Shared "last result" so screens can chain (merge → filter → fill → validate) */
+const LAST={preview:null}; function setPreview(t,label){LAST.preview={...t,label};document.querySelectorAll("[data-lastlabel]").forEach(e=>e.textContent=label);}
+function previewPicker(host, onPick){
+  const w=document.createElement("div");w.className="row";
+  w.innerHTML=`<button class="b" data-uselast>Use last result</button><span class="lede" style="margin:0">last: <span data-lastlabel>${LAST.preview?esc(LAST.preview.label):"none yet"}</span></span>`;
+  host.appendChild(w);
+  w.querySelector("[data-uselast]").onclick=()=>{if(!LAST.preview){alert("No result yet. Merge or filter something first, or upload a CSV.");return;}onPick(LAST.preview,LAST.preview.label);};
+  dropZone(host,"Drop a preview CSV here or click to browse",{onFiles:async fs=>{try{onPick(parseCSV(await readFile(fs[0])),fs[0].name);}catch(e){alert(e.message);}}});
+}
+
+/* ============================== screens ============================== */
+const SCREENS=[];
+function screen(id, group, label, build){SCREENS.push({id,group,label,build});}
+function el(html){const t=document.createElement("template");t.innerHTML=html.trim();return t.content.firstElementChild;}
+function card(host,title,inner=""){const c=el(`<div class="card">${title?`<h3>${title}</h3>`:""}${inner}</div>`);host.appendChild(c);return c;}
+
+/* ---------- Home ---------- */
+screen("home","Start","Runbook",s=>{
+  s.innerHTML=`<h2>Runbook</h2><p class="lede">Pick the workflow tab that matches the ask. Each tab says which saved query feeds it. Datasource 22, project ${PROJECT_ID}, tag honeybee-ooo.</p>`;
+  card(s,"Which tab do I need?",`<div class="tw"><table><thead><tr><th>Ask</th><th>Tab</th><th>Feeds from</th></tr></thead><tbody>
+  ${[["Two+ sender-preview dumps → one sheet","Merge previews","scripts/merge_csvs.py"],
+     ["Keep only the ids we still need (288 → 294 → 295 → 300)","Filter to id list","scripts/filter_ids.py"],
+     ["Preview has blank model_a_link / model_b_link","Fill A/B links","q 400633, 400630, 400636"],
+     ["Before send, after a fill, or check 90/91 failed","Validate links","q 400629, 400635"],
+     ["Which field holds the link?","Search links","q 400636"],
+     ["Customer / internal QC fails landed","QC + 2→3 disputes","q 400631"],
+     ["Several shippable fixer sheets → one send file + count","Backfill merge","scripts/merge_csvs.py"],
+     ["Next campaign batch (L8 first, then L10)","Campaign leftovers","q 400634 (+400637 first)"],
+     ["Build/repair an upload from existing prompts","Task uploads","README §9"],
+     ["“Give me the HTML for these 15”","HTML S3 pulls","q 400630"],
+     ["How many tasks per model pair / level","Pair inventory","q 400628"],
+     ["Sanity counts before picking leftovers","Review levels","q 400637"],
+     ["Actives + weekly quality","Actives + quality","q 400632"],
+     ["Attempt grain / hydrate source for ids","Latest attempt","q 400627"]]
+    .map(r=>`<tr><td>${r[0]}</td><td><a href="#${slug(r[1])}" data-go="${slug(r[1])}">${r[1]}</a></td><td class="mono">${r[2]}</td></tr>`).join("")}
+  </tbody></table></div>`);
+  card(s,"Guardrails (do not drift)",`<ul>
+   <li>Project <code>${PROJECT_ID}</code>, profile <code>--project l1_sxs</code> (A vs B). Do not use another project id; the proxy refuses anything else.</li>
+   <li>Queue: <b>L8 first, then L10. Never re-queue L12.</b> Never re-select ids already in a non-hollow <code>report.json</code> or a shippable fixer sheet: paste them as <code>exclude_ids</code>.</li>
+   <li>Leftover L8/L10 that are unauditable or hydrate-bug stay excluded.</li>
+   <li>Official aliases only (Model A/B names as Redash returns them).</li>
+   <li>Do not dispute Honeybee <b>406d4b</b> / <b>eff65</b>. Only dispute 2→3.</li>
+   <li>No warehouse <code>qc_validations</code> table. QC = uploaded CSV + q 400631 join.</li>
+   <li>CDS hydrate column is <code>RESPSONSE</code>. The typo is real. Do not rename it.</li>
+   <li>Never print, paste or store Redash keys. This page never sees the key.</li>
+   <li>Only Likert <b>4</b> is a tie. <code>cursor.com/dashboard/shared-chats</code> is not a Honeybee host.</li>
+   <li>GAB-38 / trajectory-model patch is out of scope. If asked, point at <code>trajectory_model_audit/</code> and stop.</li></ul>`);
+  const cmd1=`./honeybee_qc/team_run.sh all \\\n  --csv /path/to/pulled.csv \\\n  --project l1_sxs \\\n  --slots A,B \\\n  --out honeybee_qc/runs/my_batch`;
+  const cmd2=`--only-checks 110,270,280,300,310,400,450,460,470 --project l1_sxs --rating-stage --informed-stage --fetch-conversations --hydrate-workers 20 --workers 50 --task-workers 16 --model claude-haiku-4-5`;
+  card(s,"Campaign constants",`<div class="kv">
+   <div>Project</div><div><code>${PROJECT_ID}</code> (l1_sxs)</div><div>Queue</div><div>L8 first, then L10; never L12</div>
+   <div>Redash ds</div><div>22 (laptop default is sometimes 30, always pass <code>-d 22</code>)</div><div>Bot user</div><div><code>${BOT_USER}</code></div>
+   <div>Eval checks</div><div>110, 270, 280, 300, 310, 400, 450, 460, 470</div><div>Completeness</div><div>270, 300, 400</div>
+   <div>Hydrate</div><div>8 on fixer / team_run.sh; 20 only on overnight eval</div><div>Box workers</div><div>80</div>
+   <div>Dashboard</div><div><a href="${DASHBOARD}" target="_blank" rel="noopener">Honeybee OOO / delivery + QC (id 12241) ↗</a></div></div>
+   <h3 style="margin-top:14px">Eval → fixer (if someone runs the box)</h3><pre>${esc(cmd1)}</pre><button class="b" data-c1>Copy</button>
+   <h3 style="margin-top:14px">Overnight check pin</h3><pre>${esc(cmd2)}</pre><button class="b" data-c2>Copy</button>
+   <div class="note warn">Footguns: bare <code>--project l1</code> has the old ranking step and Unique Links off. Do not kill Chrome mid-hydrate. Prefix <code>6ad19e</code> is excluded on the Oct 15 campaign controller. The Oct 27–28 270/300/400-only command is retired.</div>`);
+  s.querySelector("[data-c1]").onclick=e=>copy(cmd1,e.target); s.querySelector("[data-c2]").onclick=e=>copy(cmd2,e.target);
+  card(s,"Connecting to Redash",`<p>The page itself never holds a key. To run the 11 saved queries from here, start the local proxy in Terminal. It reads <code>REDASH_API_KEY</code> from your environment or <code>~/.cursor/redash.env</code>, only allows the 11 qids below, and pins project <code>${PROJECT_ID}</code>.</p>
+   <pre>cd "honeybee_qc/ooo_handoff/viewer"\npython3 honeybee_viewer_server.py\n# then open http://127.0.0.1:8765</pre>
+   <p class="lede">Opened as a plain file, every screen still works with uploaded or pasted Redash CSV exports.</p>`);
+  s.querySelectorAll("[data-go]").forEach(a=>a.onclick=e=>{e.preventDefault();go(a.dataset.go);});
+});
+
+/* ---------- Merge previews ---------- */
+screen("merge-previews","Delivery","Merge previews",s=>{
+  s.innerHTML=`<h2>Merge previews</h2><p class="lede">2+ <code>delivery_sender_preview_*.csv</code> → one sheet. Unique <code>task_id</code> (also accepts <code>task</code>). Later file wins. New columns from later files are kept. Same logic as <code>scripts/merge_csvs.py</code>.</p>`;
+  const files=[]; const c=card(s,"1. Add files in order (top = earliest, bottom wins)");
+  const list=el(`<ul class="filelist"></ul>`);
+  dropZone(c,"Drop delivery_sender_preview_*.csv files here or click to browse",{multiple:true,onFiles:fs=>{for(const f of fs) files.push(f);draw();}});
+  c.appendChild(list);
+  const draw=()=>{list.innerHTML=files.map((f,i)=>`<li><span class="mono">${i+1}</span><span class="n">${esc(f.name)} · ${(f.size/1048576).toFixed(1)} MB</span><button class="b" data-up="${i}">↑</button><button class="b" data-dn="${i}">↓</button><button class="b" data-rm="${i}">✕</button></li>`).join("");
+    list.querySelectorAll("[data-up]").forEach(b=>b.onclick=()=>{const i=+b.dataset.up;if(i>0){[files[i-1],files[i]]=[files[i],files[i-1]];draw();}});
+    list.querySelectorAll("[data-dn]").forEach(b=>b.onclick=()=>{const i=+b.dataset.dn;if(i<files.length-1){[files[i+1],files[i]]=[files[i],files[i+1]];draw();}});
+    list.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{files.splice(+b.dataset.rm,1);draw();});};
+  const c2=card(s,"2. Merge",`<div class="row"><label class="inl"><input type="checkbox" data-keep> keep the earlier value when the later cell is blank (off = exactly like merge_csvs.py)</label></div>
+    <div class="row" style="margin-top:8px"><input type="text" data-name style="flex:1" value="delivery_sender_preview_${PROJECT_ID}_merged.csv"><button class="b p" data-go>Merge</button><button class="b" data-dl disabled>Download merged CSV</button><button class="b" data-ids disabled>Copy task_ids</button></div>
+    <div data-out></div>`);
+  let res=null;
+  c2.querySelector("[data-go]").onclick=async()=>{
+    if(files.length<1){alert("Add at least one CSV (2+ to merge).");return;}
+    try{const tabs=[];for(const f of files) tabs.push(parseCSV(await readFile(f)));
+      res=mergeTables(tabs,{keepEarlierWhenBlank:c2.querySelector("[data-keep]").checked});
+      setPreview(res,"merged ("+res.rows.length+" tasks)");
+      const out=c2.querySelector("[data-out]"); stats(out,[[files.length,"files"],[res.read,"rows read"],[res.rows.length,"unique task_id"],[res.overwritten,"later-file overwrites"],[res.headers.length,"columns"],[res.noId,"rows with no task id (dropped)"]]);
+      const t=document.createElement("div");out.appendChild(t);renderTable(t,res.headers.slice(0,12),res.rows,{limit:50});
+      c2.querySelector("[data-dl]").disabled=false;c2.querySelector("[data-ids]").disabled=false;
+    }catch(e){alert(e.message);}
+  };
+  c2.querySelector("[data-dl]").onclick=()=>download(c2.querySelector("[data-name]").value,toCSV(res.headers,res.rows));
+  c2.querySelector("[data-ids]").onclick=e=>copy(res.rows.map(r=>r.task_id).join("\n"),e.target);
+  s.appendChild(el(`<div class="note warn">Count unique ids from the stats above, not <code>wc -l</code>: chat HTML cells have embedded newlines. Don't open the merged sheet in Excel (it mangles 24-hex ids and newlines).</div>`));
+});
+
+/* ---------- Filter to id list ---------- */
+screen("filter-to-id-list","Delivery","Filter to id list",s=>{
+  s.innerHTML=`<h2>Filter to id list</h2><p class="lede">Keep only the rows whose <code>task_id</code> is in a pasted 24-hex list (newline / comma / space). Each pass is “ids we still need”, not a new pull (288 → 294 → 295 → 300). Same as <code>scripts/filter_ids.py</code>.</p>`;
+  let src=null,label="";
+  const c=card(s,"1. Preview sheet"); previewPicker(c,(t,l)=>{src=t;label=l;c.querySelector("[data-src]").textContent=`${l}: ${t.rows.length} rows`;});
+  c.appendChild(el(`<div class="lede" data-src style="margin-top:6px">none loaded</div>`));
+  const c2=card(s,"2. Ids we still need",`<textarea data-ids placeholder="Paste 24-hex task ids, one per line or separated by commas / spaces.&#10;e.g.&#10;6a5f0c1e2b3d4a5f6e7d8c9b&#10;6a5f0c1e2b3d4a5f6e7d8c9c"></textarea>
+    <div class="row" style="margin-top:8px"><button class="b p" data-go>Filter</button><button class="b" data-dl disabled>Download filtered CSV</button><button class="b" data-miss disabled>Copy ids not found</button></div><div data-out></div><div data-log></div>`);
+  let res=null,missing=[];const log=[];
+  c2.querySelector("[data-go]").onclick=()=>{
+    if(!src){alert("Load a preview sheet first.");return;}
+    const want=parseIds(c2.querySelector("[data-ids]").value); if(!want.length){alert("No 24-hex ids found in the box.");return;}
+    const ws=new Set(want); const kept=src.rows.filter(r=>ws.has(taskId(r)));
+    const have=new Set(kept.map(taskId)); missing=want.filter(x=>!have.has(x));
+    res={headers:src.headers,rows:kept}; setPreview(res,`filtered ${kept.length}/${want.length}`);
+    log.push(`${new Date().toLocaleTimeString()} · kept ${kept.length} / ${want.length} requested from ${label}`);
+    const out=c2.querySelector("[data-out]");stats(out,[[`${kept.length} / ${want.length}`,"kept / requested"],[missing.length,"requested but not in sheet"],[src.rows.length,"rows in source"]]);
+    const t=document.createElement("div");out.appendChild(t);renderTable(t,src.headers.slice(0,10),kept,{limit:30});
+    c2.querySelector("[data-log]").innerHTML=`<h3 style="margin-top:12px">Pass log</h3><pre>${esc(log.join("\n"))}</pre>`;
+    c2.querySelector("[data-dl]").disabled=false;c2.querySelector("[data-miss]").disabled=!missing.length;
+  };
+  c2.querySelector("[data-dl]").onclick=()=>download(`delivery_sender_preview_${PROJECT_ID}_filtered_${res.rows.length}.csv`,toCSV(res.headers,res.rows));
+  c2.querySelector("[data-miss]").onclick=e=>copy(missing.join("\n"),e.target);
+  s.appendChild(el(`<div class="note">A file of ids is not a Snowflake pull. Ingesting for eval needs <code>task, project, attempted_by, review_status, response</code> (overnight_pull.py / team_run.sh pull-sql).</div>`));
+});
+
+/* ---------- Fill A/B links ---------- */
+screen("fill-a-b-links","Delivery","Fill A/B links",s=>{
+  s.innerHTML=`<h2>Fill missing A/B links</h2><p class="lede">For blank <code>model_a_link</code> / <code>model_b_link</code>: prefer a public share (<code>field_4</code>, <code>gemini_final_*</code>, <code>gemini_0_trajectory_link</code>, <code>model_*_link</code>). Else use <code>model_*_chat_download[].s3Url</code> on <code>scale-cds-public-us-west-2</code>. <code>app.html</code> / <code>bscframe.html</code> are dropped. Fills are re-merged so they win.</p>`;
+  let prev=null, ex=null, fl=null, ls=null;
+  const c=card(s,"1. Preview sheet with blanks");previewPicker(c,(t,l)=>{prev=t;c.querySelector("[data-src]").textContent=`${l}: ${t.rows.length} rows`;});
+  c.appendChild(el(`<div class="lede" data-src style="margin-top:6px">none loaded</div>`));
+  const blanks=()=>prev?prev.rows.filter(r=>!(r.model_a_link||"").trim()||!(r.model_b_link||"").trim()).map(taskId):[];
+  const c2=card(s,"2. Link sources (ids = preview rows with a blank A or B)");
+  sourceWidget(c2,400633,{getIds:blanks,idsLabel:"blank rows in the preview",onLoad:d=>ex=d});
+  sourceWidget(c2,400630,{getIds:blanks,idsLabel:"blank rows in the preview",onLoad:d=>fl=d});
+  sourceWidget(c2,400636,{getIds:blanks,idsLabel:"blank rows in the preview",onLoad:d=>ls=d});
+  const c3=card(s,"3. Fill",`<div class="row"><label class="inl">When only HTML S3 exists, write it to
+    <select data-mode><option value="link">model_*_link (default)</option><option value="side">side column model_*_html_s3 (if the sender form rejects S3)</option></select></label></div>
+    <div class="row" style="margin-top:8px"><button class="b p" data-go>Fill blanks</button><button class="b" data-dl disabled>Download filled preview</button><button class="b" data-left disabled>Copy still-missing ids</button></div><div data-out></div>`);
+  let res=null,still=[];
+  c3.querySelector("[data-go]").onclick=()=>{
+    if(!prev){alert("Load the preview first.");return;} if(!ex&&!fl&&!ls){alert("Load at least one link source (400633, 400630 or 400636).");return;}
+    const mode=c3.querySelector("[data-mode]").value; const cand={};
+    const add=(id,slot,url,src,kind,rank)=>{if(!url)return;const k=id+"|"+slot;(cand[k]=cand[k]||[]).push({url:url.trim(),src,kind,rank});};
+    if(ls) for(const r of ls.rows){const id=taskId(r);const slot=(r.slot||"").toUpperCase();const f=r.field_name||"";const u=r.url||"";const cl=classifyLink(u);
+      const list=slot==="A"?A_FIELDS:B_FIELDS; const idx=list.indexOf(f);
+      if(isShare(cl)) add(id,slot,u,"400636:"+f,"share",idx>=0?idx:list.length+(/^field_/.test(f)?0:1));
+      else if(cl==="html_s3"&&!JUNK_HTML.some(j=>u.toLowerCase().endsWith(j))) add(id,slot,u,"400636:"+f,"s3",50);}
+    if(ex) for(const r of ex.rows){const id=taskId(r);
+      for(const [slot,lk,hk] of [["A","link_a","html_s3_a"],["B","link_b","html_s3_b"]]){
+        if(isShare(classifyLink(r[lk]))) add(id,slot,r[lk],"400633:"+lk,"share",-1);
+        if(classifyLink(r[hk])==="html_s3") add(id,slot,r[hk],"400633:"+hk,"s3",40);}}
+    if(fl) for(const r of fl.rows){const id=taskId(r);const slot=(r.slot||"").toUpperCase();const nm=(r.file_name||"").toLowerCase();
+      if(JUNK_HTML.includes(nm)) continue; if(classifyLink(r.s3_url)!=="html_s3") continue;
+      add(id,slot,r.s3_url,"400630:"+r.file_name,"s3",/\.m?html$/.test(nm)?30:35);}
+    const fills=[]; let fa=0,fb=0,fs3=0; still=[];
+    for(const r of prev.rows){const id=taskId(r);const o={task_id:id};let need=false;
+      for(const [slot,col] of [["A","model_a_link"],["B","model_b_link"]]){
+        if((r[col]||"").trim()) continue;
+        const cs=(cand[id+"|"+slot]||[]).sort((x,y)=>x.rank-y.rank); const best=cs.find(x=>x.kind==="share")||cs[0];
+        if(!best){need=true;continue;}
+        if(best.kind==="s3"&&mode==="side"){o[`model_${slot.toLowerCase()}_html_s3`]=best.url;}
+        else o[col]=best.url;
+        o[`${col}_fill_source`]=best.src; slot==="A"?fa++:fb++; if(best.kind==="s3") fs3++;
+      }
+      if(Object.keys(o).length>1) fills.push(o); if(need) still.push(id);}
+    const fillHeaders=[...new Set(fills.flatMap(Object.keys))];
+    res=mergeTables([prev,{headers:fillHeaders,rows:fills}]); // later (fills) wins
+    setPreview(res,"filled preview");
+    const out=c3.querySelector("[data-out]");stats(out,[[fa,"A slots filled"],[fb,"B slots filled"],[fs3,"of those from HTML S3"],[still.length,"tasks still missing a slot"]]);
+    const t=document.createElement("div");out.appendChild(t);
+    renderTable(t,["task_id","model_a_link","model_a_link_fill_source","model_b_link","model_b_link_fill_source"].filter(h=>fillHeaders.includes(h)||h==="task_id"),fills,{limit:100});
+    c3.querySelector("[data-dl]").disabled=false;c3.querySelector("[data-left]").disabled=!still.length;
+  };
+  c3.querySelector("[data-dl]").onclick=()=>download(`delivery_sender_preview_${PROJECT_ID}_filled_${ymd()}.csv`,toCSV(res.headers,res.rows));
+  c3.querySelector("[data-left]").onclick=e=>copy(still.join("\n"),e.target);
+  s.appendChild(el(`<div class="note warn"><code>field_4</code> is a real A-share field on later Argon/Gemini forms, so unlabeled <code>field_N</code> isn't ignored. AI Studio <code>/app/prompts</code> and ChatGPT <code>/c/</code> URLs are private, not shares. A Gemini share and an HTML dump of the same chat are not two models.</div>`));
+});
+
+/* ---------- Validate links ---------- */
+screen("validate-links","Delivery","Validate links",s=>{
+  s.innerHTML=`<h2>Validate links</h2><p class="lede">Structural classify, no HTTP by default: missing, private (<code>/c/</code>, <code>/app/</code>, <code>/chat/</code>), recognised share (Gemini / ChatGPT <code>/share/</code> or <code>/s/</code>, Claude <code>/share/</code>), public HTML S3 fallback (<code>scale-cds-public-us-west-2</code>) or unrecognised. Also checks <code>turn_link_a</code> / <code>turn_link_b</code> and that A ≠ B.</p>`;
+  let prev=null;
+  const c=card(s,"1. Sheet to check (preview, filled preview, or a 400633 export)");previewPicker(c,(t,l)=>{prev=t;c.querySelector("[data-src]").textContent=`${l}: ${t.rows.length} rows`;});
+  c.appendChild(el(`<div class="lede" data-src style="margin-top:6px">none loaded</div>`));
+  const c2=card(s,"2. Check",`<div class="row"><label class="inl"><input type="checkbox" data-spark> B is HTML-only Spark this batch (no Gemini share expected on B; Unique Links 91 = N/A, not a fail)</label></div>
+   <div class="row" style="margin-top:8px"><button class="b p" data-go>Validate</button><label class="inl"><input type="checkbox" data-onlybad checked> show only problems</label>
+   <button class="b" data-dl disabled>Download fail list CSV</button><button class="b" data-ids disabled>Copy fail ids</button><button class="b" data-ok disabled>Copy sendable ids</button></div><div data-out></div>`);
+  let fails=[],okIds=[];
+  const pick=(r,cands)=>{for(const k of cands) if(k in r) return r[k]; return "";};
+  c2.querySelector("[data-go]").onclick=()=>{
+    if(!prev){alert("Load a sheet first.");return;}
+    const spark=c2.querySelector("[data-spark]").checked;
+    const likCol=prev.headers.find(h=>/likert|preference/i.test(h));
+    const out=[];fails=[];okIds=[];let ties=0;
+    for(const r of prev.rows){const id=taskId(r);
+      const a=pick(r,["model_a_link","link_a"]).trim(),b=pick(r,["model_b_link","link_b"]).trim();
+      const ca=classifyLink(a),cb=classifyLink(b);
+      const issues=[];
+      if(!isSendable(ca)) issues.push("A "+ca);
+      if(!isSendable(cb)&&!(spark&&cb==="missing"&&classifyLink(pick(r,["model_b_html_s3","html_s3_b"]))==="html_s3")) issues.push("B "+cb);
+      if(a&&b&&a===b) issues.push("A and B are the same URL");
+      const ka=shareKey(a); if(ka&&b.includes(ka)) issues.push("B is a dump of A's share (same model, not a pair)");
+      const ma=(r.model_a_name||"").trim(),mb=(r.model_b_name||"").trim(); if(ma&&mb&&ma===mb) issues.push("model_a_name = model_b_name");
+      let ta="",tb="";
+      if("turn_link_a" in r){ta=(r.turn_link_a||"").trim()?"present":"blank"; if(ta==="blank") issues.push("turn_link_a blank");}
+      if("turn_link_b" in r){tb=(r.turn_link_b||"").trim()?"present":"blank"; if(tb==="blank") issues.push("turn_link_b blank");}
+      if(likCol && String(r[likCol]).trim()==="4") ties++;
+      const row={task_id:id,class_a:ca,class_b:cb,turn_link_a:ta,turn_link_b:tb,issues:issues.join("; "),model_a_link:a,model_b_link:b};
+      out.push(row); if(issues.length) fails.push(row); else okIds.push(id);}
+    const o=c2.querySelector("[data-out]");
+    stats(o,[[prev.rows.length,"tasks"],[okIds.length,"sendable"],[fails.length,"with problems"],...(likCol?[[ties,`ties (${likCol} = 4)`]]:[])]);
+    const t=document.createElement("div");o.appendChild(t);
+    const show=c2.querySelector("[data-onlybad]").checked?fails:out;
+    renderTable(t,["task_id","class_a","class_b","turn_link_a","turn_link_b","issues","model_a_link","model_b_link"],show,{fmt:{class_a:pillFor,class_b:pillFor},limit:400});
+    ["dl","ids","ok"].forEach(k=>c2.querySelector(`[data-${k}]`).disabled=false);
+  };
+  c2.querySelector("[data-dl]").onclick=()=>download(`honeybee_link_fails_${fails.length}_${ymd()}.csv`,toCSV(["task_id","class_a","class_b","turn_link_a","turn_link_b","issues","model_a_link","model_b_link"],fails));
+  c2.querySelector("[data-ids]").onclick=e=>copy(fails.map(r=>r.task_id).join("\n"),e.target);
+  c2.querySelector("[data-ok]").onclick=e=>copy(okIds.join("\n"),e.target);
+  const c3=card(s,"Project-wide views");
+  const v1=el(`<div></div>`),v2=el(`<div></div>`);
+  sourceWidget(c3,400629,{onLoad:d=>{const cnt={};d.rows.forEach(r=>{const k=r.share_class+(String(r.has_public_html_s3).toLowerCase()==="true"?" (has public HTML S3)":"");cnt[k]=(cnt[k]||0)+1;});
+    stats(v1,Object.entries(cnt).map(([k,v])=>[v,k]));const t=document.createElement("div");v1.appendChild(t);renderTable(t,d.headers,d.rows,{fmt:{share_class:pillFor}});}});
+  c3.appendChild(v1);
+  sourceWidget(c3,400635,{onLoad:d=>renderTable(v2,d.headers,d.rows)});c3.appendChild(v2);
+  s.appendChild(el(`<div class="note warn">HTTP reachability is flaky and not part of this check. <code>missing_share</code> with public HTML S3 → go to Fill A/B links. Only Likert 4 is a tie (3 and 5 are not).</div>`));
+});
+
+/* ---------- Search links ---------- */
+screen("search-links","Delivery","Search links",s=>{
+  s.innerHTML=`<h2>Search links</h2><p class="lede">Every HTTP-looking run-step field and <code>chat_download[].s3Url</code> on the latest attempt. One row per (task, slot, field, url, class).</p>
+  <div class="tw" style="max-height:none"><table><thead><tr><th>Slot</th><th>Step id</th><th>Fields</th></tr></thead><tbody>
+  <tr><td>A</td><td class="mono">step-TextCollection-29cf069962f8</td><td class="mono">field_4, gemini_final_trajectory_a, gemini_0_trajectory_link, model_a_link, model_a_chat_download[].s3Url</td></tr>
+  <tr><td>B</td><td class="mono">step-TextCollection-f7304e8fa411</td><td class="mono">gemini_final_trajectory_b, model_b_link, gpt_trajectory_link, model_b_chat_download[].s3Url</td></tr>
+  <tr><td>A turns</td><td class="mono">step-RubricCriteriaBuilder-da9bb8c86eab</td><td class="mono">annotations.turn_link_a</td></tr>
+  <tr><td>B turns</td><td class="mono">step-RubricCriteriaBuilder-0e4891d4e48f</td><td class="mono">annotations.turn_link_b</td></tr></tbody></table></div><div style="height:12px"></div>`;
+  const c=card(s,"Task ids (optional, blank = whole project)",`<textarea data-ids placeholder="Paste 24-hex task ids, one per line or separated by commas / spaces.&#10;e.g.&#10;6a5f0c1e2b3d4a5f6e7d8c9b&#10;6a5f0c1e2b3d4a5f6e7d8c9c"></textarea>`);
+  let data=null;
+  sourceWidget(c,400636,{getIds:()=>parseIds(c.querySelector("[data-ids]").value),onLoad:d=>{data=d;draw();}});
+  const f=card(s,"Filter",`<div class="row"><select data-slot><option value="">any slot</option><option>A</option><option>B</option></select>
+    <input type="text" data-field placeholder="field contains…"><select data-cls><option value="">any class</option></select>
+    <button class="b" data-dl disabled>Download rows</button></div><div data-out></div>`);
+  let shown=[];
+  const draw=()=>{if(!data)return;
+    data.rows.forEach(r=>r.viewer_class=classifyLink(r.url));
+    const cls=f.querySelector("[data-cls]"); const cur=cls.value; cls.innerHTML=`<option value="">any class</option>`+[...new Set(data.rows.map(r=>r.viewer_class))].map(x=>`<option${x===cur?" selected":""}>${x}</option>`).join("");
+    const want=new Set(parseIds(c.querySelector("[data-ids]").value)); const slot=f.querySelector("[data-slot]").value, fld=f.querySelector("[data-field]").value.toLowerCase(), cl=cls.value;
+    shown=data.rows.filter(r=>(!want.size||want.has(taskId(r)))&&(!slot||(r.slot||"").toUpperCase()===slot)&&(!fld||(r.field_name||"").toLowerCase().includes(fld))&&(!cl||r.viewer_class===cl));
+    const o=f.querySelector("[data-out]");stats(o,[[shown.length,"rows"],[new Set(shown.map(taskId)).size,"tasks"]]);
+    const t=document.createElement("div");o.appendChild(t);renderTable(t,["task_id","review_level","slot","field_name","url","link_class","viewer_class"],shown,{fmt:{link_class:pillFor,viewer_class:pillFor},limit:500});
+    f.querySelector("[data-dl]").disabled=false;};
+  f.querySelectorAll("select,input").forEach(x=>x.oninput=draw);
+  f.querySelector("[data-dl]").onclick=()=>download(`honeybee_link_search_${ymd()}.csv`,toCSV(["task_id","review_level","slot","field_name","url","link_class","viewer_class"],shown));
+  s.appendChild(el(`<div class="note">Inline <code>ta.response</code> is often a CDS pointer (<code>type=ResponseObject</code>). The saved query already hydrates from <code>view.cds_chat_task_attempt_responses.RESPSONSE</code> then <code>etl.cds_s3</code>.</div>`));
+});
+
+/* ---------- QC + disputes ---------- */
+screen("qc-2-3-disputes","QC","QC + 2→3 disputes",s=>{
+  s.innerHTML=`<h2>QC fails, feedback and 2→3 disputes</h2><p class="lede">Upload the QC / fail-band CSV (<code>Ops_in_Queue_All_QC_*.csv</code> or the customer sheet), join with q 400631, then decide per task. Agree → no file. Disagree <b>and</b> the ask is 2→3 → write <code>qc_dispute_&lt;24hex&gt;.md</code> in third person. There is no warehouse <code>qc_validations</code> table.</p>`;
+  let qc=null, join=null, idCol="";
+  const c=card(s,"1. QC CSV");
+  dropZone(c,"Drop the QC / fail-band CSV here",{onFiles:async fs=>{try{qc=parseCSV(await readFile(fs[0]));
+    idCol=qc.headers.find(h=>/^(task_?id|task|id)$/i.test(h.trim()))||qc.headers.find(h=>/task/i.test(h))||"";
+    qc.rows.forEach(r=>{let id=(r[idCol]||"").match(HEX24);if(!id) id=Object.values(r).join(" ").match(HEX24);r.__id=id?id[0].toLowerCase():"";});
+    c.querySelector("[data-src]").textContent=`${fs[0].name}: ${qc.rows.length} rows, ${new Set(qc.rows.map(r=>r.__id).filter(Boolean)).size} task ids (id column: ${idCol||"scanned"})`;draw();}catch(e){alert(e.message);}}});
+  c.appendChild(el(`<div class="lede" data-src style="margin-top:6px">none loaded</div>`));
+  const c2=card(s,"2. Join current attempt (q 400631)");
+  sourceWidget(c2,400631,{getIds:()=>qc?[...new Set(qc.rows.map(r=>r.__id).filter(Boolean))]:[],idsLabel:"the QC CSV",onLoad:d=>{join=d;draw();}});
+  const c3=card(s,"3. Decide per task",`<div data-out></div>`);
+  const decisions={};
+  const blocked=id=>NO_DISPUTE.some(p=>id.startsWith(p)||id.includes(p));
+  const scoreCols=()=>qc?qc.headers.filter(h=>/score|band|rating|grade/i.test(h)):[];
+  const textCols=()=>qc?qc.headers.filter(h=>/writeup|feedback|comment|reason|note|rationale|explanation/i.test(h)):[];
+  function draw(){if(!qc)return;const o=c3.querySelector("[data-out]");
+    const jm=new Map((join?join.rows:[]).map(r=>[taskId(r),r]));
+    const sc=scoreCols(),tc=textCols(); const ids=[...new Set(qc.rows.map(r=>r.__id).filter(Boolean))];
+    let h=`<div class="tw"><table><thead><tr><th>task_id</th><th>QC score</th><th>QC writeup</th><th>A / B</th><th>links</th><th>last attempter</th><th>decision</th></tr></thead><tbody>`;
+    for(const id of ids){const q=qc.rows.find(r=>r.__id===id);const j=jm.get(id)||{};
+      const score=sc.map(k=>q[k]).filter(Boolean).join(" / ");const txt=tc.map(k=>q[k]).filter(Boolean).join(" · ");
+      const blk=blocked(id);
+      h+=`<tr><td class="mono">${id}${j.row_status==="not_in_project"?' <span class="pill bad">not in project</span>':""}</td><td>${esc(score)}</td><td>${esc(txt.slice(0,260))}${txt.length>260?"…":""}</td>
+       <td>${esc(j.model_a_name||"")}<br>${esc(j.model_b_name||"")}</td>
+       <td>${j.link_a?`<a href="${esc(j.link_a)}" target="_blank" rel="noopener">A</a> ${pillFor(classifyLink(j.link_a))}`:""}<br>${j.link_b?`<a href="${esc(j.link_b)}" target="_blank" rel="noopener">B</a> ${pillFor(classifyLink(j.link_b))}`:""}</td>
+       <td>${esc(j.last_attempter_email||"")}<br><span class="lede">${esc(j.last_attempted_at_pt||"")}</span></td>
+       <td>${blk?'<span class="pill bad">406d4b / eff65: do not dispute</span>':`<select data-dec="${id}"><option value="">—</option><option value="agree"${decisions[id]==="agree"?" selected":""}>Agree (no file)</option><option value="no23"${decisions[id]==="no23"?" selected":""}>Disagree, not 2→3 (no file)</option><option value="dispute"${decisions[id]==="dispute"?" selected":""}>Disagree, 2→3 → dispute</option></select>`}</td></tr>`;}
+    h+="</tbody></table></div>";
+    const n=k=>Object.values(decisions).filter(v=>v===k).length;
+    o.innerHTML=`<div class="stats"><div class="stat"><b>${ids.length}</b><span>QC tasks</span></div><div class="stat"><b>${join?join.rows.filter(r=>r.row_status==="found").length:"–"}</b><span>found in project</span></div><div class="stat"><b>${n("agree")}</b><span>agree</span></div><div class="stat"><b>${n("dispute")}</b><span>2→3 disputes</span></div></div>`+h;
+    o.querySelectorAll("[data-dec]").forEach(sel=>sel.onchange=()=>{decisions[sel.dataset.dec]=sel.value;draw();if(sel.value==="dispute") openDispute(sel.dataset.dec);});
+  }
+  const d=card(s,"4. Dispute writer",`<div class="lede">Pick “Disagree, 2→3” on a row to open it here.</div><div data-form></div>`);
+  function openDispute(id){const f=d.querySelector("[data-form]");const q=qc.rows.find(r=>r.__id===id);const tc=textCols();
+    f.innerHTML=`<div class="kv" style="margin-bottom:8px"><div>task_id</div><div class="mono">${id}</div><div>file</div><div class="mono">qc_dispute_${id}.md</div></div>
+    <div class="row"><label class="inl">QC score <input type="number" data-from value="2" style="width:70px"></label><label class="inl">proposed <input type="number" data-to value="3" style="width:70px"></label></div>
+    <p><b>What QC wrote</b></p><textarea data-qc>${esc(tc.map(k=>q[k]).filter(Boolean).join("\n\n"))}</textarea>
+    <p><b>What the prompt asked</b></p><textarea data-ask placeholder="Quote the opening prompt ask the QC point is about."></textarea>
+    <p><b>Delivered lines that already grade that ask</b></p><textarea data-lines placeholder="Quote the delivered rubric criterion / transcript lines verbatim."></textarea>
+    <p><b>Why the named fail band does not hold (band math)</b></p><textarea data-why placeholder="e.g. 1 major across 14 criteria = 7%, under the 10% line for band 2."></textarea>
+    <div class="row" style="margin-top:8px"><button class="b p" data-mk>Build + lint</button><button class="b" data-dlmd disabled>Download qc_dispute_${id}.md</button></div><div data-lint></div><pre data-md style="display:none"></pre>`;
+    let md="";
+    f.querySelector("[data-mk]").onclick=()=>{const g=k=>f.querySelector(`[data-${k}]`).value.trim();const lint=[];
+      if(blocked(id)) lint.push(["bad","406d4b / eff65 is never disputed."]);
+      if(!(g("from")==="2"&&g("to")==="3")) lint.push(["bad","Only 2→3 is disputed. 3→4, style nits and “I would have scored it differently” are not."]);
+      const all=[g("ask"),g("lines"),g("why")].join("\n");
+      if(/(^|[^a-z])(i|i'm|i’ve|i've|me|my|we|our|i think)([^a-z]|$)/i.test(all)) lint.push(["warn","First-person wording found. Disputes are third person (first person gets bounced)."]);
+      if(!g("lines")) lint.push(["bad","Quote the delivered criterion. Without it the reader has nothing to check."]);
+      if(!/\d/.test(g("why"))) lint.push(["warn","No numbers in the band reasoning. A 2→3 move needs the band math, not a vibe."]);
+      if(/(api[_ -]?key|Authorization:|Key\s+[A-Za-z0-9]{20,}|[A-Za-z0-9]{40})/i.test(all)) lint.push(["bad","Looks like a key or Redash credential. Remove it."]);
+      md=`# QC dispute: ${id}\n\nProject: Honeybee L1 SxS (\`${PROJECT_ID}\`)\nRequested change: score 2 → 3\n\n## What QC wrote\n\n${g("qc").split("\n").map(l=>"> "+l).join("\n")}\n\n## What the prompt asked\n\n${g("ask")}\n\n## Delivered lines that already grade this ask\n\n${g("lines")}\n\n## Why the band 2 call does not hold\n\n${g("why")}\n`;
+      const bad=lint.some(x=>x[0]==="bad");
+      f.querySelector("[data-lint]").innerHTML=lint.length?lint.map(([k,t])=>`<div class="note ${k}">${esc(t)}</div>`).join(""):`<div class="note">Lint clean. Read it once more for third person before sending.</div>`;
+      const pre=f.querySelector("[data-md]");pre.style.display="block";pre.textContent=md;f.querySelector("[data-dlmd]").disabled=bad;};
+    f.querySelector("[data-dlmd]").onclick=()=>download(`qc_dispute_${id}.md`,md,"text/markdown");
+    d.scrollIntoView({behavior:"smooth"});}
+});
+
+/* ---------- Backfill merge ---------- */
+screen("backfill-merge","QC","Backfill merge",s=>{
+  s.innerHTML=`<h2>Shippable backfill_steps merge</h2><p class="lede">Combine paste-ready <code>backfill_steps_shippable_batch_*.csv</code> and/or <code>honeybee_qc/runs/*/fixer/backfill_steps.csv</code>. Unique <code>task_id</code>, later batch wins. The unique count below comes from a real CSV parser; <code>wc -l</code> overcounts because cells hold newlines.</p>`;
+  const files=[];const c=card(s,"1. Batches in order (bottom wins)");const list=el(`<ul class="filelist"></ul>`);
+  dropZone(c,"Drop backfill_steps CSVs here",{multiple:true,accept:".csv,.txt",onFiles:fs=>{for(const f of fs){
+    if(/readme/i.test(f.name)){alert(`Skipped ${f.name}: never send README.txt.`);continue;}
+    if(!/\.csv$/i.test(f.name)){alert(`Skipped ${f.name}: not a CSV.`);continue;} files.push(f);}draw();}});
+  c.appendChild(list);
+  const draw=()=>{list.innerHTML=files.map((f,i)=>`<li><span class="mono">${i+1}</span><span class="n">${esc(f.name)}</span><button class="b" data-rm="${i}">✕</button></li>`).join("");list.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{files.splice(+b.dataset.rm,1);draw();});};
+  const c2=card(s,"2. Gate + merge",`<label class="inl"><input type="checkbox" data-inv> Every sheet above passed <code>fixer_invariants</code> (gate exit 0, no <code>hold_tasks</code>)</label>
+    <p><b>Over-20% exclusion ids</b> (optional, from <code>excluded_over20_ids.txt</code> when <code>combine_safe</code> is in play)</p><textarea data-ex placeholder="Paste ids to leave out (24-hex, any separator). Blank = nothing excluded."></textarea>
+    <div class="row" style="margin-top:8px"><label class="inl">batch label <input type="text" data-b placeholder="129_130" style="width:120px"></label><button class="b p" data-go>Merge</button><button class="b" data-dl disabled>Download shippable CSV</button><button class="b" data-ids disabled>Copy task_ids</button></div><div data-out></div>`);
+  let res=null;
+  c2.querySelector("[data-go]").onclick=async()=>{
+    if(!c2.querySelector("[data-inv]").checked){alert("Only sheets that passed fixer_invariants are shippable. Tick the box once you've checked fixer_invariants.json.");return;}
+    if(!files.length){alert("Add at least one backfill_steps CSV.");return;}
+    try{const tabs=[];for(const f of files) tabs.push(parseCSV(await readFile(f)));
+      const m=mergeTables(tabs); const ex=new Set(parseIds(c2.querySelector("[data-ex]").value));
+      const kept=m.rows.filter(r=>!ex.has(r.task_id)); res={headers:m.headers,rows:kept};
+      stats(c2.querySelector("[data-out]"),[[kept.length,"unique tasks to report"],[m.read,"rows read"],[m.overwritten,"later-batch overwrites"],[m.rows.length-kept.length,"dropped (over-20% list)"]]);
+      c2.querySelector("[data-dl]").disabled=false;c2.querySelector("[data-ids]").disabled=false;}catch(e){alert(e.message);}
+  };
+  c2.querySelector("[data-dl]").onclick=()=>{const b=c2.querySelector("[data-b]").value.trim()||"merged";download(`backfill_steps_shippable_batch_${b}_${ymd()}.csv`,toCSV(res.headers,res.rows));};
+  c2.querySelector("[data-ids]").onclick=e=>copy(res.rows.map(r=>r.task_id).join("\n"),e.target);
+  s.appendChild(el(`<div class="note">Save into <code>~/Downloads/honeybee_fixer_to_send/</code>. Send every new CSV there, skip already-sent ones, never send the README.</div>`));
+});
+
+/* ---------- Campaign leftovers ---------- */
+screen("campaign-leftovers","Campaign","Campaign leftovers",s=>{
+  s.innerHTML=`<h2>Campaign leftovers</h2><p class="lede">Pending L8 first, then L10. <b>Never L12.</b> Never re-select ids already in a non-hollow <code>report.json</code> or a shippable fixer sheet: paste them as <code>exclude_ids</code>. Unauditable / hydrate-bug leftovers stay excluded. Check Review levels (q 400637) first.</p>`;
+  const c=card(s,"1. Exclusions",`<div class="grid2"><div><p><b>exclude_ids</b>: prior audit / fixer ids</p><textarea data-ex placeholder="Paste ids to leave out (24-hex, any separator). Blank = nothing excluded."></textarea><div class="lede" data-exn></div></div>
+   <div><p><b>Unauditable / hydrate-bug ids</b> (stay excluded, remembered in this browser)</p><textarea data-ub placeholder="Paste unauditable / hydrate-bug ids. This list is saved in this browser."></textarea><div class="lede" data-ubn></div></div></div>`);
+  const ex=c.querySelector("[data-ex]"),ub=c.querySelector("[data-ub]");ub.value=store.get("unauditable");
+  const cnt=()=>{c.querySelector("[data-exn]").textContent=parseIds(ex.value).length+" ids";c.querySelector("[data-ubn]").textContent=parseIds(ub.value).length+" ids";};
+  ex.oninput=cnt;ub.oninput=()=>{store.set("unauditable",ub.value);cnt();};cnt();
+  const allEx=()=>[...new Set([...parseIds(ex.value),...parseIds(ub.value)])];
+  let data=null;const c2=card(s,"2. Leftovers");
+  sourceWidget(c2,400634,{getExclude:allEx,onLoad:d=>{data=d;draw();}});
+  const c3=card(s,"3. Pick",`<div class="row"><label class="inl">how many <input type="number" data-n value="100" style="width:90px"></label><button class="b p" data-pick>Pick L8 first, then L10</button><button class="b" data-dl disabled>Download picked CSV</button><button class="b" data-cp disabled>Copy picked ids</button></div><div data-out></div>`);
+  let pool=[],picked=[];
+  function draw(){if(!data)return;const exs=new Set(allEx());let l12=0,dropped=0,other=0;
+    pool=data.rows.filter(r=>{const lv=parseInt(r.review_level,10);if(lv===12){l12++;return false;}if(lv!==8&&lv!==10){other++;return false;}if(exs.has(taskId(r))){dropped++;return false;}return true;})
+      .sort((a,b)=>(parseInt(a.review_level,10)===8?0:1)-(parseInt(b.review_level,10)===8?0:1)||taskId(a).localeCompare(taskId(b)));
+    const o=c3.querySelector("[data-out]");
+    stats(o,[[pool.filter(r=>+r.review_level===8).length,"L8 available"],[pool.filter(r=>+r.review_level===10).length,"L10 available"],[dropped,"excluded (exclude_ids + unauditable)"],[l12,"L12 dropped (never re-queued)"],...(other?[[other,"other levels dropped"]]:[])]);}
+  c3.querySelector("[data-pick]").onclick=()=>{if(!data){alert("Load q 400634 first.");return;}draw();const n=parseInt(c3.querySelector("[data-n]").value,10)||0;picked=pool.slice(0,n);
+    const t=document.createElement("div");c3.querySelector("[data-out]").appendChild(t);renderTable(t,data.headers,picked,{limit:200});
+    c3.querySelector("[data-dl]").disabled=false;c3.querySelector("[data-cp]").disabled=false;};
+  c3.querySelector("[data-dl]").onclick=()=>download(`honeybee_leftovers_L8_L10_${picked.length}_${ymd()}.csv`,toCSV(data.headers,picked));
+  c3.querySelector("[data-cp]").onclick=e=>copy(picked.map(taskId).join("\n"),e.target);
+  s.appendChild(el(`<div class="note warn">A file of ids is not enough to ingest. Pull latest attempts with <code>honeybee_qc/overnight_pull.py</code> or <code>team_run.sh pull-sql</code>, then eval → fixer → invariants. Fixer hydrate is 8, not 20.</div>`));
+});
+
+/* ---------- Task uploads ---------- */
+screen("task-uploads","Campaign","Task uploads",s=>{
+  s.innerHTML=`<h2>Task uploads</h2><p class="lede">Check or repair an upload CSV built from existing prompts (start from the latest <code>Ultra_Evals_-_task_upload_from_existing_prompts_YYYY_MM_DD.csv</code>). Do not invent columns. A delivery_sender_preview is not an upload sheet.</p>`;
+  const c=card(s,"Allowed columns",`<div class="mono" style="font-size:12px">${UPLOAD_COLS.join(", ")}</div>
+    <p class="lede" style="margin-top:6px">L1 is A/B only, so <code>model_c_name</code> / <code>model_d_name</code> stay blank. Demo columns only when the universe needs a logged-in demo; keep real passwords in your Downloads copy, never in a repo.</p>
+    <button class="b" data-tpl>Download header-only template</button>`);
+  c.querySelector("[data-tpl]").onclick=()=>download("honeybee_task_upload_template.csv",toCSV(UPLOAD_COLS,[]));
+  const c1=card(s,"Official aliases",`<p class="lede">Model names are checked against these. Load q 400628 to fill from live pairs, or paste one alias per line.</p><textarea data-al></textarea>`);
+  const al=c1.querySelector("[data-al]");al.value=store.get("aliases");al.oninput=()=>store.set("aliases",al.value);
+  sourceWidget(c1,400628,{onLoad:d=>{const s2=new Set(al.value.split("\n").map(x=>x.trim()).filter(Boolean));d.rows.forEach(r=>{[r.model_a_name,r.model_b_name].forEach(x=>{if(x&&!/unnamed/.test(x)) s2.add(x.trim());});});al.value=[...s2].join("\n");store.set("aliases",al.value);}});
+  const c2=card(s,"Check an upload CSV");let up=null,fname="";
+  dropZone(c2,"Drop the upload CSV here",{onFiles:async fs=>{try{up=parseCSV(await readFile(fs[0]));fname=fs[0].name;check();}catch(e){alert(e.message);}}});
+  const out=el(`<div></div>`);c2.appendChild(out);
+  function check(){const issues=[];const H=up.headers;
+    if(/delivery_sender_preview/i.test(fname)||H.some(h=>/^(model_a_link|model_b_link|link_a|link_b)$/i.test(h))) issues.push(["bad","This looks like a delivery_sender_preview, not an upload sheet. Don't upload it."]);
+    const extra=H.filter(h=>!UPLOAD_COLS.includes(h)); if(extra.length) issues.push(["bad","Columns not in the upload shape (don't invent columns): "+extra.join(", ")]);
+    const miss=["opening_prompt","model_a_name","model_b_name"].filter(h=>!H.includes(h)); if(miss.length) issues.push(["warn","Missing columns: "+miss.join(", ")]);
+    const aliases=new Set(al.value.split("\n").map(x=>x.trim()).filter(Boolean));
+    const rowIssues=[];
+    up.rows.forEach((r,i)=>{const p=[];
+      if("og_task_id" in r){const v=(r.og_task_id||"").trim();if(!v) p.push("og_task_id blank (needed on replacement uploads)");else if(!/^[0-9a-f]{24}$/i.test(v)) p.push("og_task_id not 24-hex (Excel?)");}
+      if((r.model_c_name||"").trim()||(r.model_d_name||"").trim()) p.push("model_c/d set, L1 is A/B only");
+      for(const k of ["model_a_name","model_b_name"]){const v=(r[k]||"").trim();if(!v) p.push(k+" blank");else if(aliases.size&&!aliases.has(v)) p.push(`${k} “${v}” is not an official alias`);}
+      if(!(r.opening_prompt||"").trim()) p.push("opening_prompt blank");
+      if(p.length) rowIssues.push({row:i+2,og_task_id:r.og_task_id||"",issues:p.join("; ")});});
+    if(H.some(h=>/password/i.test(h))&&up.rows.some(r=>(r.demo_password||r.demo_password_b||"").trim())) issues.push(["warn","Demo passwords are filled. Keep this file in Downloads only; never commit or paste it."]);
+    if(!aliases.size) issues.push(["warn","No official aliases loaded, so model names weren't checked."]);
+    out.innerHTML=`<div class="stats"><div class="stat"><b>${up.rows.length}</b><span>rows</span></div><div class="stat"><b>${rowIssues.length}</b><span>rows with problems</span></div></div>`+issues.map(([k,t])=>`<div class="note ${k}">${esc(t)}</div>`).join("")+(issues.length||rowIssues.length?"":`<div class="note">Looks good. After upload, confirm the new task ids in Latest attempt (q 400627) / Review levels (q 400637) before anyone evals them.</div>`);
+    if(rowIssues.length){const t=document.createElement("div");out.appendChild(t);renderTable(t,["row","og_task_id","issues"],rowIssues);}
+    const btn=el(`<button class="b" style="margin-top:8px">Download with only allowed columns</button>`);out.appendChild(btn);
+    btn.onclick=()=>download(fname.replace(/\.csv$/i,"")+"_clean.csv",toCSV(UPLOAD_COLS.filter(h=>H.includes(h)),up.rows));}
+});
+
+/* ---------- HTML S3 pulls ---------- */
+screen("html-s3-pulls","Campaign","HTML S3 pulls",s=>{
+  s.innerHTML=`<h2>HTML S3 pulls</h2><p class="lede">Public chat-export S3 URLs for a task-id list, in wide form: <code>task_id, model_a_html_s3, model_a_html_name, model_b_html_s3, model_b_html_name</code>. Private <code>etl.cds_s3</code> / <code>scale-cds://</code> is not viewer-openable and is left out. <code>app.html</code> / <code>bscframe.html</code> are dropped.</p>`;
+  const c=card(s,"Task ids",`<textarea data-ids placeholder="Paste 24-hex task ids, one per line or separated by commas / spaces.&#10;e.g.&#10;6a5f0c1e2b3d4a5f6e7d8c9b&#10;6a5f0c1e2b3d4a5f6e7d8c9c"></textarea>`);let data=null;
+  sourceWidget(c,400630,{getIds:()=>parseIds(c.querySelector("[data-ids]").value),onLoad:d=>{data=d;draw();}});
+  const o=card(s,"Result",`<div class="row"><button class="b" data-dl disabled>Download wide CSV</button><button class="b" data-long disabled>Download long CSV</button></div><div data-out></div>`);
+  let wide=[];const WH=["task_id","model_a_html_s3","model_a_html_name","model_b_html_s3","model_b_html_name"];
+  function draw(){const want=new Set(parseIds(c.querySelector("[data-ids]").value));const by=new Map();let priv=0,junk=0;
+    for(const r of data.rows){const id=taskId(r);if(want.size&&!want.has(id))continue;const nm=(r.file_name||"").toLowerCase();
+      if(JUNK_HTML.includes(nm)){junk++;continue;} if(classifyLink(r.s3_url)!=="html_s3"){priv++;continue;}
+      const slot=(r.slot||"").toLowerCase();if(!by.has(id)) by.set(id,{task_id:id});const w=by.get(id);
+      const rank=/\.m?html$/.test(nm)?0:1;const k=`model_${slot}_html_s3`;
+      if(!w[k]||rank<(w["_r"+slot]??9)){w[k]=r.s3_url;w[`model_${slot}_html_name`]=r.file_name;w["_r"+slot]=rank;}}
+    wide=[...by.values()];const missing=[...want].filter(x=>!by.has(x));
+    const out=o.querySelector("[data-out]");stats(out,[[wide.length,"tasks with public HTML"],[wide.filter(w=>w.model_a_html_s3).length,"have A"],[wide.filter(w=>w.model_b_html_s3).length,"have B"],[priv,"private / non-public skipped"],[junk,"app.html / bscframe.html dropped"],...(want.size?[[missing.length,"requested with no HTML"]]:[])]);
+    const t=document.createElement("div");out.appendChild(t);renderTable(t,WH,wide);o.querySelector("[data-dl]").disabled=false;o.querySelector("[data-long]").disabled=false;}
+  o.querySelector("[data-dl]").onclick=()=>download(`honeybee_html_s3_${wide.length}_${ymd()}.csv`,toCSV(WH,wide));
+  o.querySelector("[data-long]").onclick=()=>download(`honeybee_html_s3_long_${ymd()}.csv`,toCSV(data.headers,data.rows));
+});
+
+/* ---------- Pair inventory ---------- */
+screen("pair-inventory","Numbers","Pair inventory",s=>{
+  s.innerHTML=`<h2>Pair inventory</h2><p class="lede">Latest-attempt counts by Model A/B names × L8 / L10 / L12.</p>`;
+  const c=card(s,"");const out=el(`<div></div>`);
+  sourceWidget(c,400628,{onLoad:d=>{const pv=new Map();const tot={L8:0,L10:0,L12:0,other:0};
+    for(const r of d.rows){const k=r.model_a_name+" ‖ "+r.model_b_name;if(!pv.has(k)) pv.set(k,{model_a_name:r.model_a_name,model_b_name:r.model_b_name,L8:0,L10:0,L12:0,other:0,total:0});
+      const p=pv.get(k);const lab=["L8","L10","L12"].includes(r.review_level_label)?r.review_level_label:"other";const n=+r.task_count||0;p[lab]+=n;p.total+=n;tot[lab]+=n;}
+    const rows=[...pv.values()].sort((a,b)=>b.total-a.total);
+    stats(out,[[tot.L8,"L8"],[tot.L10,"L10"],[tot.L12,"L12"],[tot.other,"other levels"],[rows.length,"model pairs"]]);
+    const t=document.createElement("div");out.appendChild(t);renderTable(t,["model_a_name","model_b_name","L8","L10","L12","other","total"],rows);}});
+  c.appendChild(out);
+});
+
+/* ---------- Review levels ---------- */
+screen("review-levels","Numbers","Review levels",s=>{
+  s.innerHTML=`<h2>Review-level distribution</h2><p class="lede">Latest-attempt <code>review_level</code> × <code>attempted_at_review_level</code> × <code>review_status</code>. Run this before picking leftovers.</p>`;
+  const c=card(s,"");const out=el(`<div></div>`);
+  sourceWidget(c,400637,{onLoad:d=>{const by={};d.rows.forEach(r=>{by[r.review_level]=(by[r.review_level]||0)+(+r.tasks||0);});
+    const max=Math.max(1,...Object.values(by));
+    out.innerHTML=`<div style="margin:10px 0">${Object.entries(by).sort((a,b)=>+a[0]-+b[0]).map(([k,v])=>`<div class="row" style="flex-wrap:nowrap"><span style="width:60px">L${esc(k)}</span><div style="flex:1"><div class="bar" style="width:${(v/max*100).toFixed(1)}%"></div></div><b style="width:70px;text-align:right">${v}</b></div>`).join("")}</div>`;
+    const t=document.createElement("div");out.appendChild(t);renderTable(t,d.headers,d.rows);}});
+  c.appendChild(out);
+});
+
+/* ---------- Actives + quality ---------- */
+screen("actives-quality","Numbers","Actives + quality",s=>{
+  s.innerHTML=`<h2>Last 7d actives + weekly quality</h2><p class="lede">Daily active attempters (PT, attempt-level −1, bot and <code>%scale%</code> emails dropped) plus weekly quality from <code>view.contributor_project_weekly_quality_score</code>. There is no PWI table.</p>`;
+  const c=card(s,"");const out=el(`<div></div>`);
+  sourceWidget(c,400632,{onLoad:d=>{const days=d.rows.filter(r=>r.day_pt);const max=Math.max(1,...days.map(r=>+r.daily_active_attempters||0));
+    const wk=new Map();d.rows.forEach(r=>{if(r.quality_week&&!wk.has(r.quality_week)) wk.set(r.quality_week,r);});
+    out.innerHTML=`<h3>Daily actives</h3>`+days.map(r=>`<div class="row" style="flex-wrap:nowrap"><span style="width:110px" class="mono">${esc(String(r.day_pt).slice(0,10))}</span><div style="flex:1"><div class="bar" style="width:${((+r.daily_active_attempters||0)/max*100).toFixed(1)}%"></div></div><b style="width:50px;text-align:right">${esc(r.daily_active_attempters)}</b></div>`).join("");
+    const t=document.createElement("div");out.appendChild(t);renderTable(t,["day_pt","daily_active_attempters","tasks_touched","attempts","accepted","fixed","rejected"],days);
+    const h=el(`<h3 style="margin-top:14px">Weekly quality</h3>`);out.appendChild(h);const t2=document.createElement("div");out.appendChild(t2);
+    renderTable(t2,["quality_week","avg_final_score","quality_good","quality_above_average","quality_below_average","quality_bad"],[...wk.values()]);}});
+  c.appendChild(out);
+});
+
+/* ---------- Latest attempt ---------- */
+screen("latest-attempt","Numbers","Latest attempt",s=>{
+  s.innerHTML=`<h2>Latest attempt lookup</h2><p class="lede">One latest <code>taskattempts</code> row per task (<code>attempt_version</code>, then <code>attempted_at</code>) with the hydrate source: <code>cds_view</code> (RESPSONSE), <code>etl_cds_s3</code>, or <code>inline</code>. Bot excluded; scale emails stay (ops extract, not a people-count).</p>`;
+  const c=card(s,"Task ids (blank = whole project)",`<textarea data-ids placeholder="Paste 24-hex task ids, one per line or separated by commas / spaces.&#10;e.g.&#10;6a5f0c1e2b3d4a5f6e7d8c9b&#10;6a5f0c1e2b3d4a5f6e7d8c9c"></textarea>`);const out=el(`<div></div>`);
+  sourceWidget(c,400627,{getIds:()=>parseIds(c.querySelector("[data-ids]").value),onLoad:d=>{const want=parseIds(c.querySelector("[data-ids]").value);
+    const src={};d.rows.forEach(r=>src[r.response_source]=(src[r.response_source]||0)+1);const have=new Set(d.rows.map(taskId));
+    stats(out,[[d.rows.length,"tasks"],...Object.entries(src).map(([k,v])=>[v,"source: "+k]),...(want.length?[[want.filter(x=>!have.has(x)).length,"requested, not found"]]:[])]);
+    const t=document.createElement("div");out.appendChild(t);renderTable(t,d.headers,d.rows);
+    const b=el(`<button class="b" style="margin-top:8px">Download</button>`);out.appendChild(b);b.onclick=()=>download(`honeybee_latest_attempt_${d.rows.length}_${ymd()}.csv`,toCSV(d.headers,d.rows));}});
+  c.appendChild(out);
+});
+
+/* ---------- Query catalog ---------- */
+screen("query-catalog","Numbers","Query catalog",s=>{
+  s.innerHTML=`<h2>Query catalog</h2><p class="lede">The 11 saved queries from <code>ALL_QUERIES.sql</code> (ds 22, tag honeybee-ooo). Don't add queries. Paste 24-hex ids into <code>{{task_ids}}</code> / <code>{{exclude_ids}}</code> as commas, no quotes. Dashboard: <a href="${DASHBOARD}" target="_blank" rel="noopener">id 12241 ↗</a></p>`;
+  for(const q of CATALOG){const c=card(s,`<a href="${q.url}" target="_blank" rel="noopener">${q.qid}</a> · ${esc(q.title)}`,
+    `<div class="lede">${esc(q.purpose)}</div><div>params: ${q.params.map(p=>`<code>${p}</code>`).join(" ")}</div><details style="margin-top:6px"><summary>SQL</summary><pre>${esc(q.sql)}</pre><button class="b">Copy SQL</button></details>`);
+    c.querySelector("details button").onclick=e=>copy(q.sql,e.target);}
+});
+
+/* ============================== step-by-step guides ============================== */
+const GUIDES={
+"home":{when:"Start here if you're not sure which tab you need.",
+ steps:["Find the ask in the <b>Which tab do I need?</b> table below and click the tab name.",
+  "Every tab has this same box at the top: what the tab is for, the steps in order, what you get out, and what to do next.",
+  "Tabs that need Redash data show a grey <b>q 4006xx</b> box. You can fill it three ways: <b>Run on Redash</b> (only when the local server is running), <b>Upload CSV export</b> (download it from Redash yourself), or <b>Paste CSV</b>. Each box has a “How do I get this data?” section with the exact clicks.",
+  "Tabs pass results along. After you merge or filter, the next tab's <b>Use last result</b> button picks it up, so you don't have to download and re-upload in between.",
+  "Nothing you load leaves this browser tab. Closing the tab clears everything except the two lists noted on Campaign leftovers and Task uploads."],
+ out:"Nothing on this tab. It's the map plus the rules.",
+ next:"Usual delivery order: <b>Merge previews → Filter to id list → Fill A/B links → Validate links</b>, then send. QC fails go to <b>QC + 2→3 disputes</b>. Fixer output goes to <b>Backfill merge</b>.",
+ watch:["If the top-right badge says <b>CSV mode</b>, the Run on Redash buttons stay grey. Use Upload CSV export instead, or start the local server (bottom of this page).",
+  "Never paste a Redash API key into this page, a CSV, a dispute file or Slack."]},
+"merge-previews":{when:"You have two or more <code>delivery_sender_preview_6a567b80aaa4d140131eae6c_*.csv</code> dumps (or a fixer sheet plus a delivery sheet) and need one sheet with each task once.",
+ steps:["Find the CSVs, usually in <code>~/Downloads/</code>. Don't open them in Excel first (it breaks the 24-hex ids and the chat HTML).",
+  "Drag them all into the box under <b>1. Add files in order</b>, or click the box to pick them.",
+  "Put them in order with ↑ / ↓. <b>The bottom file wins</b>: if a task is in two files, its values come from the lower one. Put the newest pull last.",
+  "Leave “keep the earlier value when the later cell is blank” <b>off</b> unless you know the newer file has blanks you don't want. Off = exactly what <code>merge_csvs.py</code> does.",
+  "Click <b>Merge</b>. Check the numbers: <b>unique task_id</b> is how many tasks are in the merged sheet. <b>later-file overwrites</b> is how many tasks were in more than one file.",
+  "Click <b>Download merged CSV</b>. Keep the default name or change the suffix (e.g. <code>_Test_merged.csv</code>)."],
+ out:"One CSV: each task_id once, every column from every file, values from the latest file.",
+ next:"Go to <b>Filter to id list</b> and press <b>Use last result</b> to cut it to the ids you still need.",
+ watch:["Report the <b>unique task_id</b> number, not a line count. Chat HTML cells have line breaks, so <code>wc -l</code> overcounts.",
+  "If a row has no task_id or task column it's dropped, and the count shows up in the stats.",
+  "Files over ~400 MB won't load in a browser. Run <code>scripts/filter_ids.py</code> on the big file first."]},
+"filter-to-id-list":{when:"You have a big preview sheet and a short list of ids that still need to go out (the 288 → 294 → 295 → 300 pattern).",
+ steps:["Under <b>1. Preview sheet</b>, press <b>Use last result</b> (if you just merged) or drop the preview CSV in the box.",
+  "Paste the ids you still need into <b>2. Ids we still need</b>. Any separator works: new lines, commas or spaces. Upper or lower case is fine (they're lowercased).",
+  "Click <b>Filter</b>. Read <b>kept / requested</b>: e.g. <code>294 / 300</code> means 6 ids you asked for aren't in this sheet.",
+  "If some are missing, click <b>Copy ids not found</b> and look them up in <b>Latest attempt</b> or ask for a newer preview pull.",
+  "Click <b>Download filtered CSV</b>.",
+  "Next pass: paste the next “still need” list and click Filter again. The <b>Pass log</b> keeps a record of each pass so you can report it."],
+ out:"A CSV with the same columns, only the requested ids.",
+ next:"<b>Fill A/B links</b> (if any model_a_link / model_b_link is blank), then <b>Validate links</b>.",
+ watch:["Each pass is “ids we still need”, not a new Snowflake pull.",
+  "A list of ids alone isn't enough to run eval. That needs a pull with task, project, attempted_by, review_status, response."]},
+"fill-a-b-links":{when:"The preview has blank <code>model_a_link</code> or <code>model_b_link</code> cells, or this is a Spark / HTML-only B batch.",
+ steps:["Under <b>1. Preview sheet with blanks</b>, press <b>Use last result</b> or drop the preview CSV.",
+  "Under <b>2. Link sources</b>, load <b>q 400633</b> (delivery-preview extract). This is the main source. The ids it needs are the preview rows with a blank link; with the local server on, <b>Run on Redash</b> sends them automatically. Without it, open the query, paste those ids into task_ids, run, download the CSV and upload it here.",
+  "Optional but recommended: also load <b>q 400630</b> (HTML/S3 files) and <b>q 400636</b> (field-level link search). They find links the extract misses, e.g. on <code>field_4</code>.",
+  "Under <b>3. Fill</b>, choose where HTML S3 links go. Default writes them into <code>model_*_link</code>. Pick “side column” only if the sender form rejects S3 links.",
+  "Click <b>Fill blanks</b>. The table shows each filled slot and where the link came from (<code>model_a_link_fill_source</code>).",
+  "Click <b>Download filled preview</b>. Use <b>Copy still-missing ids</b> for anything left blank."],
+ out:"The preview with blanks filled. Filled values win over the original. A <code>*_fill_source</code> column shows which query and field each link came from.",
+ next:"Always run <b>Validate links</b> on the filled sheet (press Use last result there).",
+ watch:["Order the viewer uses: public share first (<code>field_4</code>, <code>gemini_final_*</code>, <code>gemini_0_trajectory_link</code>, <code>model_*_link</code>), then public HTML S3. <code>app.html</code> / <code>bscframe.html</code> are never used.",
+  "<code>/app/</code>, <code>/c/</code>, <code>/chat/</code> links are private, not shares, so they're never used to fill.",
+  "Still-missing ids usually mean the contributor never saved a share or a download. Those can't be filled from data."]},
+"validate-links":{when:"Before every send, after a fill, or when check 90 / 91 failed.",
+ steps:["Under <b>1. Sheet to check</b>, press <b>Use last result</b> (after Fill) or drop a preview / filled preview / q 400633 export.",
+  "If B in this batch is Spark HTML-only, tick the <b>Spark</b> box so a missing B share with public HTML S3 isn't counted as a fail.",
+  "Click <b>Validate</b>. Each task gets a class for A and B: green = sendable (share or public HTML S3), red = missing / private / not a Honeybee host, yellow = unrecognised host (open it and check).",
+  "Read the <b>issues</b> column. Anything there blocks the pair: blank or private link, A and B the same URL, B is a dump of A's own share, same model name on both sides, blank turn_link_a / turn_link_b.",
+  "Click <b>Copy fail ids</b> or <b>Download fail list CSV</b> for the short fail list. <b>Copy sendable ids</b> gives you the clean set.",
+  "Optional: under <b>Project-wide views</b>, load q 400629 for every missing/invalid link in the project, and q 400635 for turn_link coverage by review level."],
+ out:"A short fail list (task_id, class A/B, issues, links). It's a list, not a new taxonomy.",
+ next:"Fails with a blank share → back to <b>Fill A/B links</b>. Still failing → leave them out of the send and note the ids.",
+ watch:["This check is structural (looks at the URL). It doesn't open links. HTTP reachability is flaky and isn't the default.",
+  "<code>cursor.com/dashboard/shared-chats</code> is not a Honeybee host.",
+  "A Gemini share plus an HTML dump of that same chat is one model, not a pair.",
+  "Only Likert <b>4</b> is a tie. If the sheet has a Likert/preference column, the tie count uses 4 only."]},
+"search-links":{when:"A link is blank and you need to know which field actually holds it (field_4 vs gemini_0_trajectory_link vs model_a_chat_download).",
+ steps:["Paste the task ids into the box (or leave it blank to search the whole project; that's slow).",
+  "Load <b>q 400636</b>: Run on Redash, or run it in Redash with the same ids and upload the CSV.",
+  "Use the filters: slot A or B, a field name (e.g. <code>field_4</code>), or a link class (e.g. <code>gemini_share</code>).",
+  "Click any URL to open it. <b>viewer_class</b> is this page's classification; <b>link_class</b> is the query's. They should match.",
+  "Click <b>Download rows</b> if you need to hand the list to someone."],
+ out:"One row per (task, slot, field, url, class).",
+ next:"Copy the right URL into the preview, or rerun <b>Fill A/B links</b> with this export loaded.",
+ watch:["The step ids are in the table above: A = step-TextCollection-29cf069962f8, B = step-TextCollection-f7304e8fa411.",
+  "Results are always from the latest attempt (attempt_version, then attempted_at)."]},
+"qc-2-3-disputes":{when:"A QC or customer fail list lands (e.g. <code>Ops_in_Queue_All_QC_*.csv</code>) and you need to agree or dispute each task.",
+ steps:["Drop the QC CSV into <b>1. QC CSV</b>. The viewer finds the task id column by itself and shows how many ids it found.",
+  "Under <b>2. Join current attempt</b>, load <b>q 400631</b> with those ids (Run on Redash sends them for you). This adds current Model A/B names, final links and the last attempter.",
+  "In <b>3. Decide per task</b>, open the A and B links and read the QC writeup against the delivered rubric and transcript.",
+  "Pick a decision per task: <b>Agree</b> = no file. <b>Disagree, not 2→3</b> = no file. <b>Disagree, 2→3</b> = opens the dispute writer.",
+  "In <b>4. Dispute writer</b>, fill all four boxes in third person: what QC wrote, what the prompt asked, the delivered lines that already grade that ask (quote them), and why the band doesn't hold (with the numbers, e.g. majors / criteria vs the 10% line).",
+  "Click <b>Build + lint</b>. Fix anything red. Yellow is a warning (e.g. first-person words). When it's clean, click <b>Download qc_dispute_&lt;task_id&gt;.md</b>.",
+  "Save the files in <code>~/Downloads/</code> next to the earlier <code>qc_dispute_*.md</code> ones (match their tone)."],
+ out:"Zero or more <code>qc_dispute_&lt;24hex&gt;.md</code> files, one per disputed task.",
+ next:"Send the dispute files the usual way. Tasks you agreed with need nothing.",
+ watch:["Only dispute <b>2 → 3</b>. Never 3 → 4, style nits, or “would have scored it differently”.",
+  "Never dispute Honeybee <b>406d4b</b> / <b>eff65</b>. Those rows show a red label instead of a menu.",
+  "First person (“I think”) gets bounced. Quoting QC without quoting the delivered criterion gives the reader nothing to check.",
+  "There's no qc_validations table in the warehouse. The QC CSV you upload is the only source."]},
+"backfill-merge":{when:"One or more fixer batches passed invariants and you need one paste-ready send file plus the task count.",
+ steps:["Find the sheets: <code>~/Downloads/honeybee_fixer_to_send/backfill_steps_shippable_batch_*.csv</code> and/or <code>honeybee_qc/runs/&lt;batch&gt;/fixer/backfill_steps.csv</code>.",
+  "Check each batch's <code>fixer_invariants.json</code>: gate exit 0 and no <code>hold_tasks</code>. A sheet that failed is not shippable.",
+  "Drop the CSVs into <b>1. Batches in order</b>, oldest at the top. The bottom batch wins on repeats. README.txt is refused.",
+  "Tick the <b>passed fixer_invariants</b> box (Merge won't run without it).",
+  "If the campaign uses <code>combine_safe</code>, paste the ids from <code>excluded_over20_ids.txt</code> into the over-20% box so those rows are dropped.",
+  "Type the batch label (e.g. <code>129_130</code>) and click <b>Merge</b>. The big number, <b>unique tasks to report</b>, is the count you report.",
+  "Click <b>Download shippable CSV</b>. It's named <code>backfill_steps_shippable_batch_&lt;label&gt;_&lt;YYYYMMDD&gt;.csv</code>."],
+ out:"One shippable CSV and the unique-task number.",
+ next:"Save it into <code>~/Downloads/honeybee_fixer_to_send/</code> and send it. Send every new CSV there; skip ones already sent.",
+ watch:["Never use <code>wc -l</code> for the count. backfill_steps cells contain line breaks.",
+  "Never send README.txt or a sheet that failed fixer_invariants."]},
+"campaign-leftovers":{when:"Picking the next campaign batch for eval → fixer.",
+ steps:["First go to <b>Review levels</b> and load q 400637 to sanity-check the queue.",
+  "Under <b>1. Exclusions</b>, paste every id already in a non-hollow <code>report.json</code> or a shippable fixer sheet into <b>exclude_ids</b>.",
+  "Paste known unauditable / hydrate-bug ids into the right-hand box. This browser remembers that list, so you only add new ones next time.",
+  "Under <b>2. Leftovers</b>, load <b>q 400634</b>. Run on Redash sends both lists as exclude_ids; if you upload a CSV instead, the viewer still removes them.",
+  "Under <b>3. Pick</b>, set how many and click <b>Pick L8 first, then L10</b>. Check the counts: L12 rows are always dropped and counted.",
+  "Click <b>Copy picked ids</b> or <b>Download picked CSV</b>."],
+ out:"The next batch of ids: L8 first, then L10, none excluded, no L12.",
+ next:"Pull latest attempts for those ids (<code>honeybee_qc/overnight_pull.py</code> or <code>team_run.sh pull-sql</code>), then run eval → fixer → invariants (command on the Runbook tab).",
+ watch:["Never re-queue L12.","Never re-select prior ids. If you're unsure whether an id was audited, leave it out.",
+  "Official aliases only.","Fixer hydrate is 8; 20 is only for overnight eval."]},
+"task-uploads":{when:"Building or repairing an upload CSV from existing prompts (a new traffic/aspirational slice, or a duplicate-upload replacement).",
+ steps:["Click <b>Download header-only template</b> if you're starting fresh, or start from the latest <code>Ultra_Evals_-_task_upload_from_existing_prompts_YYYY_MM_DD.csv</code>.",
+  "Fill it in a text editor or Google Sheets (not Excel). For replacements, keep <code>og_task_id</code> so ops can retire the duplicate.",
+  "Under <b>Official aliases</b>, load q 400628 (or paste the names) so model names can be checked.",
+  "Drop the upload CSV into <b>Check an upload CSV</b>. Read every red and yellow note and the row table.",
+  "If it only had extra columns, click <b>Download with only allowed columns</b> for a cleaned copy."],
+ out:"A checked upload CSV with only the allowed columns.",
+ next:"Upload it. Then confirm the new task ids in <b>Latest attempt</b> / <b>Review levels</b> before anyone evals them.",
+ watch:["A delivery_sender_preview is not an upload sheet. The checker stops you.",
+  "L1 is A/B only: leave model_c_name / model_d_name blank.",
+  "Demo passwords stay in your Downloads copy only. Never commit or paste them."]},
+"html-s3-pulls":{when:"Someone asks for the HTML for a set of tasks, or you need S3 links to fill preview gaps.",
+ steps:["Paste the task ids into the box.","Load <b>q 400630</b> (Run on Redash, or run it in Redash with those ids and upload the CSV).",
+  "Read the counts: tasks with public HTML, how many have A and B, and how many private or junk files were skipped.",
+  "Click <b>Download wide CSV</b> (one row per task) or <b>Download long CSV</b> (one row per file)."],
+ out:"<code>honeybee_html_s3_&lt;n&gt;_&lt;YYYYMMDD&gt;.csv</code> with task_id, model_a_html_s3, model_a_html_name, model_b_html_s3, model_b_html_name.",
+ next:"Save it in <code>~/Downloads/</code>. To put the links into a preview, use <b>Fill A/B links</b>.",
+ watch:["Only <code>scale-cds-public-us-west-2</code> HTTPS links open in a browser. Private <code>etl.cds_s3</code> / <code>scale-cds://</code> are left out."]},
+"pair-inventory":{when:"Someone asks how many tasks there are per model pair or per review level.",
+ steps:["Load <b>q 400628</b> (no ids needed).","Read the totals at the top (L8, L10, L12) and the per-pair table below, sorted by total."],
+ out:"Counts of latest attempts by Model A × Model B × review level.",next:"Use these numbers for status updates. Pick work from <b>Campaign leftovers</b>, not from here.",
+ watch:["“A (unnamed)” / “B (unnamed)” means the model-name prefiller was empty on those attempts.","Counts are tasks (latest attempt each), not people."]},
+"review-levels":{when:"Before picking leftovers, or when the queue looks off.",
+ steps:["Load <b>q 400637</b> (no ids needed).","The bars show tasks per review level. The table splits them by attempted_at_review_level and review_status, with accepted / fixed / rejected."],
+ out:"A sanity view of where every task currently sits.",next:"Go to <b>Campaign leftovers</b>.",watch:["L12 is shown for counting only. It is never re-queued."]},
+"actives-quality":{when:"Someone asks how many people are working or how weekly quality looks.",
+ steps:["Load <b>q 400632</b> (no ids needed).","Top: daily active attempters for the last 7 days (Pacific time). Below: the same days with tasks touched and outcomes, then weekly quality buckets."],
+ out:"Daily actives and weekly quality numbers.",next:"Use them for the status update.",
+ watch:["Actives count attempt-level −1 only, with the bot and %scale% emails dropped.","There is no PWI table, so don't look for one."]},
+"latest-attempt":{when:"You need the current attempt for some ids, or to check whether a task hydrates from CDS.",
+ steps:["Paste the task ids (blank = whole project, slow).","Load <b>q 400627</b>.","Check <b>response_source</b>: <code>cds_view</code> = hydrated from RESPSONSE, <code>etl_cds_s3</code> = from S3, <code>inline</code> = stored on the attempt.","Click <b>Download</b> if needed."],
+ out:"One row per task: attempt id, version, time (UTC and PT), attempter, review level and status, hydrate source.",
+ next:"Use it to confirm new uploads, or to check ids that went missing in a filter.",
+ watch:["The CDS column really is spelled <code>RESPSONSE</code>. Don't “fix” it in any SQL.","The bot is excluded; scale emails stay (this is an ops extract, not a people-count)."]},
+"query-catalog":{when:"You want to run a query by hand in Redash or read its SQL.",
+ steps:["Click the qid to open the saved query in Redash.","Set <code>project_id</code> = <code>6a567b80aaa4d140131eae6c</code> (it's the default).","Paste 24-hex ids into <code>task_ids</code> or <code>exclude_ids</code>, separated by commas. No quotes.","Make sure the datasource is <b>22</b>, then Execute.","To use the result here: ⋮ menu (or the Download button) under the results → <b>Download as CSV File</b>, then upload it on the matching tab."],
+ out:"The SQL for all 11 saved queries.",next:"Go to the tab that uses the query.",watch:["There are exactly 11 queries. Don't add new ones.","Dashboard: Honeybee OOO / delivery + QC (id 12241)."]}
+};
+function renderGuide(sec,id){const g=GUIDES[id];if(!g)return;
+  const box=el(`<div class="card guide"><div class="row" style="justify-content:space-between"><h3 style="margin:0">📋 How to use this tab</h3><button class="b" data-tg>Hide steps</button></div>
+    <div data-body><p style="margin:8px 0 6px"><b>Use it when:</b> ${g.when}</p>
+    <ol class="steps">${g.steps.map(s=>`<li>${s}</li>`).join("")}</ol>
+    <div class="grid2" style="margin-top:6px"><div class="gbox"><b>What you get</b><div>${g.out}</div></div><div class="gbox"><b>What to do next</b><div>${g.next}</div></div></div>
+    ${g.watch&&g.watch.length?`<div class="gbox warn" style="margin-top:10px"><b>⚠️ Watch out for</b><ul>${g.watch.map(w=>`<li>${w}</li>`).join("")}</ul></div>`:""}</div></div>`);
+  const lede=sec.querySelector(".lede");(lede||sec.firstChild).after(box);
+  const body=box.querySelector("[data-body]"),tg=box.querySelector("[data-tg]");
+  const set=h=>{body.style.display=h?"none":"block";tg.textContent=h?"Show steps":"Hide steps";};
+  set(store.get("guide_hidden_"+id)==="1");
+  tg.onclick=()=>{const h=body.style.display!=="none";store.set("guide_hidden_"+id,h?"1":"0");set(h);};
+  box.querySelectorAll("a[data-go]").forEach(a=>a.onclick=e=>{e.preventDefault();go(a.dataset.go);});
+}
+
+/* ============================== nav ============================== */
+function slug(x){return x.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");}
+const nav=document.getElementById("nav"),main=document.getElementById("main");let lastGroup="";
+for(const sc of SCREENS){
+  if(sc.group!==lastGroup){nav.appendChild(el(`<span class="grp">${sc.group}</span>`));lastGroup=sc.group;}
+  const b=el(`<button data-id="${sc.id}">${sc.label}</button>`);b.onclick=()=>go(sc.id);nav.appendChild(b);
+  const sec=document.createElement("section");sec.className="screen";sec.id="s-"+sc.id;main.appendChild(sec);sc.build(sec);renderGuide(sec,sc.id);
+}
+function go(id){if(!SCREENS.find(x=>x.id===id)) id="home";
+  document.querySelectorAll("section.screen").forEach(x=>x.classList.toggle("active",x.id==="s-"+id));
+  nav.querySelectorAll("button").forEach(x=>x.classList.toggle("active",x.dataset.id===id));
+  if(location.hash!=="#"+id) history.replaceState(null,"","#"+id); window.scrollTo(0,0);}
+window.addEventListener("hashchange",()=>go(location.hash.slice(1)));
+go(location.hash.slice(1)||"home");
+detectProxy();
+</script>
+</body>
+</html>

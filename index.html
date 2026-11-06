@@ -55,7 +55,7 @@ tr:nth-child(even) td{background:rgba(127,127,160,.05)}
 .files li{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
 .files .n{flex:1}
 label.inl{display:inline-flex;gap:6px;align-items:center;color:var(--mid)}
-input[type=text],textarea{font:inherit;border:1px solid var(--line);border-radius:8px;padding:7px 9px;color:var(--ink);background:#fff}
+input[type=text],select,textarea{font:inherit;border:1px solid var(--line);border-radius:8px;padding:7px 9px;color:var(--ink);background:#fff}
 textarea{width:100%;min-height:88px;font-family:var(--mono);font-size:12px}
 code,.mono{font-family:var(--mono);font-size:12px}
 a{color:var(--accent)}
@@ -108,8 +108,18 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
 
   <section id="upload">
     <h2>Task upload</h2>
-    <p class="lede">Paste task ids. This runs query 400607 and downloads the upload CSV. Model names, demo logins, language, environment, estimated turns, and credential mode come back blank on every row. Fill model A and model B before anyone uploads the file.</p>
+    <p class="lede">Paste task ids, name the two models, and pick a credential mode. This runs query 400607 and downloads the upload CSV. Language is en_US on every row. Demo logins, environment, and estimated turns stay blank.</p>
     <div class="card">
+      <div class="row">
+        <label class="inl">Model A <input type="text" id="upload-model-a" placeholder="Argon Task"></label>
+        <label class="inl">Model B <input type="text" id="upload-model-b" placeholder="Fable 5.1"></label>
+        <label class="inl">Credential mode
+          <select id="upload-credential">
+            <option value="single" selected>single</option>
+            <option value="double">double</option>
+          </select>
+        </label>
+      </div>
       <textarea id="upload-ids" placeholder="Paste task ids, one per line or separated by commas"></textarea>
       <div class="row" style="margin-top:10px">
         <button class="b p" id="upload-go">Build CSV</button>
@@ -426,8 +436,35 @@ document.getElementById("merge-dl").onclick=()=>{ if(merged) download("honeybee_
 
 /* ---------- task upload (Redash 400607) ---------- */
 let uploadRows=[], uploadHeaders=[];
+function stampUpload(rows){
+  const a=document.getElementById("upload-model-a").value.trim();
+  const b=document.getElementById("upload-model-b").value.trim();
+  const mode=document.getElementById("upload-credential").value;
+  return rows.map(r=>{
+    const o={};
+    for(const h of uploadHeaders){
+      if(h==="model_c_name"||h==="model_d_name") continue;
+      o[h]=r[h];
+    }
+    o.model_a_name=a;
+    o.model_b_name=b;
+    o.languageCode="en_US";
+    o.credential_mode=mode;
+    return o;
+  });
+}
+function uploadHeaderList(){
+  const headers=uploadHeaders.filter(h=>h!=="model_c_name"&&h!=="model_d_name");
+  for(const h of ["model_a_name","model_b_name","languageCode","credential_mode"]){
+    if(!headers.includes(h)) headers.push(h);
+  }
+  return headers;
+}
 document.getElementById("upload-go").onclick=async()=>{
   const status=document.getElementById("upload-status");
+  const modelA=document.getElementById("upload-model-a").value.trim();
+  const modelB=document.getElementById("upload-model-b").value.trim();
+  if(!modelA||!modelB){ status.textContent="Enter a Model A name and a Model B name."; return; }
   const ids=(document.getElementById("upload-ids").value.match(/[0-9a-fA-F]{24}/g)||[]);
   const seen=new Set(), unique=[];
   for(const id of ids){ const t=id.toLowerCase(); if(!seen.has(t)){ seen.add(t); unique.push(t); } }
@@ -440,16 +477,18 @@ document.getElementById("upload-go").onclick=async()=>{
     uploadRows=data.rows;
     const found=new Set(uploadRows.map(r=>(r.og_task_id||"").toLowerCase()));
     const missing=unique.filter(id=>!found.has(id));
-    document.getElementById("upload-out").innerHTML=`<div class="stats"><div class="stat ok"><b>${uploadRows.length}</b><span>rows</span></div><div class="stat ${missing.length?"bad":""}"><b>${missing.length}</b><span>ids not returned</span></div></div>`
+    const headers=uploadHeaderList();
+    const stamped=stampUpload(uploadRows);
+    document.getElementById("upload-out").innerHTML=`<div class="stats"><div class="stat ok"><b>${stamped.length}</b><span>rows</span></div><div class="stat ${missing.length?"bad":""}"><b>${missing.length}</b><span>ids not returned</span></div></div>`
       +(missing.length?`<div class="note warn">Not returned: ${esc(missing.join(", "))}</div>`:"");
     document.getElementById("upload-dl").disabled=false;
-    download("honeybee_task_upload.csv", toCSV(uploadHeaders, uploadRows));
-    status.textContent="Downloaded "+uploadRows.length+" rows. Model name and demo columns are blank.";
+    download("honeybee_task_upload.csv", toCSV(headers, stamped));
+    status.textContent="Downloaded "+stamped.length+" rows. Language is en_US. Credential mode is "+document.getElementById("upload-credential").value+".";
   }catch(e){ status.textContent=e.message; }
   finally{ document.getElementById("upload-go").disabled=false; }
 };
 document.getElementById("upload-dl").onclick=()=>{
-  if(uploadRows.length) download("honeybee_task_upload.csv", toCSV(uploadHeaders, uploadRows));
+  if(uploadRows.length) download("honeybee_task_upload.csv", toCSV(uploadHeaderList(), stampUpload(uploadRows)));
 };
 
 /* ---------- batch progress ---------- */

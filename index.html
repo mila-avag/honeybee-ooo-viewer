@@ -115,7 +115,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
         <button class="b" id="upload-tpl">Download header-only template</button>
         <button class="b p" id="upload-aliases">Refresh official model names</button>
       </div>
-      <p class="lede" id="alias-status">Model names are checked against the live pairs from Redash (query 400628). Refresh loads them.</p>
+      <p class="lede" id="alias-status">Model names are checked against the names on the latest attempts. Refresh loads them.</p>
       <label class="drop" id="upload-drop">Drop the upload CSV here<input type="file" accept=".csv"></label>
       <div id="upload-out"></div>
     </div>
@@ -123,7 +123,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
 
   <section id="batch">
     <h2>Batch progress</h2>
-    <p class="lede">How many latest attempts sit in each review layer, split by the Model A / Model B pair. Refresh pulls query 400628. You do not open Redash.</p>
+    <p class="lede">How many tasks of each Model A / Model B pair are in each review layer right now. An open layer is the pending review node. Completed means the task is finished and nothing is waiting. Refresh reads this from Redash. The first load takes a few minutes.</p>
     <div class="card">
       <div class="row">
         <button class="b p" id="batch-go">Refresh</button>
@@ -357,7 +357,7 @@ let aliases=new Set();
 document.getElementById("upload-tpl").onclick=()=>download("honeybee_task_upload_template.csv", toCSV(UPLOAD_COLS, []));
 document.getElementById("upload-aliases").onclick=async()=>{
   const status=document.getElementById("alias-status");
-  status.textContent="Loading model names from Redash…";
+  status.textContent="Loading model names. This usually takes a few minutes…";
   try{
     const data=await runQuery(400628);
     aliases=new Set();
@@ -417,11 +417,11 @@ function drawUpload(){
 let batchRows=[];
 document.getElementById("batch-go").onclick=async()=>{
   const status=document.getElementById("batch-status");
-  status.textContent="Running query 400628…";
+  status.textContent="Reading the live queue. This usually takes a few minutes…";
   document.getElementById("batch-go").disabled=true;
   try{
     const data=await runQuery(400628);
-    const levels=["L-1","L0","L1","L4","L8","L10","L12","other"];
+    const levels=["L-1","L0","L1","L4","L8","L10","L11","L12","Completed","Not open","other"];
     const pairs=new Map();
     let total=0;
     for(const r of data.rows){
@@ -430,15 +430,16 @@ document.getElementById("batch-go").onclick=async()=>{
       const key=a+"  vs  "+b;
       const n=Number(r.task_count)||0;
       const lvl=Number(r.review_level);
-      const label=[-1,0,1,4,8,10,12].includes(lvl) ? "L"+lvl : "other";
-      if(!pairs.has(key)) pairs.set(key, {model_a_name:a, model_b_name:b, "L-1":0,L0:0,L1:0,L4:0,L8:0,L10:0,L12:0,other:0,total:0});
+      const known={"L-1":1,L0:1,L1:1,L4:1,L8:1,L10:1,L11:1,L12:1,Completed:1,"Not open":1};
+      const label=known[r.review_level_label] ? r.review_level_label : ([-1,0,1,4,8,10,11,12].includes(lvl) ? "L"+lvl : "other");
+      if(!pairs.has(key)) pairs.set(key, {model_a_name:a, model_b_name:b, "L-1":0,L0:0,L1:0,L4:0,L8:0,L10:0,L11:0,L12:0,Completed:0,"Not open":0,other:0,total:0});
       const row=pairs.get(key);
       row[label]+=n; row.total+=n; total+=n;
     }
     batchRows=[...pairs.values()].sort((x,y)=>y.total-x.total);
     const sum={};
     for(const lv of levels) sum[lv]=batchRows.reduce((s,r)=>s+r[lv],0);
-    document.getElementById("batch-stats").innerHTML=`<div class="stats"><div class="stat"><b>${total}</b><span>latest attempts</span></div><div class="stat"><b>${batchRows.length}</b><span>model pairs</span></div><div class="stat"><b>${sum.L8}</b><span>L8</span></div><div class="stat"><b>${sum.L10}</b><span>L10</span></div><div class="stat"><b>${sum.L12}</b><span>L12</span></div><div class="stat"><b>${sum["L-1"]}</b><span>L-1</span></div></div>`;
+    document.getElementById("batch-stats").innerHTML=`<div class="stats"><div class="stat"><b>${total}</b><span>tasks</span></div><div class="stat"><b>${batchRows.length}</b><span>model pairs</span></div><div class="stat"><b>${sum.L8}</b><span>open L8</span></div><div class="stat"><b>${sum.L10}</b><span>open L10</span></div><div class="stat"><b>${sum.L12}</b><span>open L12</span></div><div class="stat"><b>${sum.Completed}</b><span>completed</span></div></div>`;
     const headers=["model_a_name","model_b_name",...levels,"total"];
     renderRows(document.getElementById("batch-table"), headers, batchRows.map(r=>{
       const o={}; for(const h of headers) o[h]=r[h]||0; o.model_a_name=r.model_a_name; o.model_b_name=r.model_b_name; return o;
@@ -449,7 +450,7 @@ document.getElementById("batch-go").onclick=async()=>{
   finally{ document.getElementById("batch-go").disabled=false; }
 };
 document.getElementById("batch-dl").onclick=()=>{
-  const headers=["model_a_name","model_b_name","L-1","L0","L1","L4","L8","L10","L12","other","total"];
+  const headers=["model_a_name","model_b_name","L-1","L0","L1","L4","L8","L10","L11","L12","Completed","Not open","other","total"];
   download("honeybee_batch_progress.csv", toCSV(headers, batchRows));
 };
 

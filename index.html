@@ -138,20 +138,15 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
 
   <section id="deliveries">
     <h2>Ultra deliveries</h2>
-    <p class="lede">Query 390037, Ultra Deliveries October. Delivered in the last 21 days, still pending at L8, L10, or L12, and still in attempt, by model pair. The pivot is the same one saved on that query: it sums Total and hides the older model A names.</p>
+    <p class="lede">The pivot from query 390037. Every model pair is included.</p>
     <div class="card">
       <div class="row">
         <button class="b p" id="del-go">Refresh</button>
         <button class="b" id="del-cached">Load saved result</button>
-        <button class="b" id="del-dl" disabled>Download query CSV</button>
-        <button class="b" id="del-pivot-dl" disabled>Download pivot CSV</button>
+        <button class="b" id="del-pivot-dl" disabled>Download CSV</button>
         <span class="lede" id="del-status" style="margin:0"></span>
       </div>
-      <div id="del-stats"></div>
-      <h3 style="margin:16px 0 6px;font-size:16px">Pivot table</h3>
       <div id="del-pivot"></div>
-      <h3 style="margin:16px 0 6px;font-size:16px">Query</h3>
-      <div id="del-table"></div>
     </div>
   </section>
 </main>
@@ -476,15 +471,7 @@ document.getElementById("batch-dl").onclick=()=>{
 };
 
 /* ---------- deliveries (Redash 390037, pivot 672678) ---------- */
-let delRows=[], delHeaders=[], delPivot=[];
-const DEL_HIDE=new Set([
-  "Gemini 3.8 Flash Extended Thinking (custom)",
-  "GPT 5.6 Terra Medium",
-  "Gemini 4 Candidate",
-  "Gemini Flash (Model Beetle)",
-  "Gemini Base",
-  "Gemini Pro > Model Beetle"
-]);
+let delRows=[], delPivot=[];
 const DEL_PIVOT=[
   ["MODEL_A_NAME","MODEL_A_NAME"],
   ["MODEL_B_NAME","MODEL_B_NAME"],
@@ -498,9 +485,8 @@ const DEL_PIVOT=[
 ];
 function num(v){ const n=Number(v); return Number.isFinite(n)?n:0; }
 function drawDeliveries(){
-  const shown=delRows.filter(r=>!DEL_HIDE.has((r.MODEL_A_NAME||"").trim()));
   const groups=new Map();
-  for(const r of shown){
+  for(const r of delRows){
     const key=DEL_PIVOT.slice(0,-1).map(([k])=>r[k]||"").join("\u0001");
     if(!groups.has(key)){
       const row={};
@@ -520,10 +506,6 @@ function drawDeliveries(){
   });
   pivotRows.push(Object.assign({MODEL_A_NAME:"Total"}, Object.fromEntries(pivotHeaders.slice(1,-1).map(h=>[h,""])), {Total:total}));
   renderRows(document.getElementById("del-pivot"), pivotHeaders, pivotRows);
-  renderRows(document.getElementById("del-table"), delHeaders, delRows);
-  const sum=k=>delRows.reduce((s,r)=>s+num(r[k]),0);
-  document.getElementById("del-stats").innerHTML=`<div class="stats"><div class="stat"><b>${delRows.length}</b><span>pairs in the query</span></div><div class="stat"><b>${shown.length}</b><span>pairs in the pivot</span></div><div class="stat ok"><b>${sum("DELIVERED_LAST_21D")}</b><span>delivered, 21d</span></div><div class="stat"><b>${sum("PENDING_TO_DELIVER")}</b><span>pending L8–L12</span></div><div class="stat"><b>${sum("PENDING_IN_ATTEMPT")}</b><span>pending in attempt</span></div></div>`;
-  document.getElementById("del-dl").disabled=false;
   document.getElementById("del-pivot-dl").disabled=false;
 }
 async function loadDeliveries(fresh){
@@ -533,7 +515,6 @@ async function loadDeliveries(fresh){
   document.getElementById("del-cached").disabled=true;
   try{
     const data=await runQuery(390037, {max_age: fresh?0:60*60*24*30});
-    delHeaders=data.headers;
     delRows=data.rows;
     drawDeliveries();
     const when=data.retrieved_at?new Date(data.retrieved_at).toLocaleString():"";
@@ -546,7 +527,6 @@ async function loadDeliveries(fresh){
 }
 document.getElementById("del-go").onclick=()=>loadDeliveries(true);
 document.getElementById("del-cached").onclick=()=>loadDeliveries(false);
-document.getElementById("del-dl").onclick=()=>download("ultra_deliveries.csv", toCSV(delHeaders, delRows));
 document.getElementById("del-pivot-dl").onclick=()=>{
   const headers=DEL_PIVOT.map(([,label])=>label);
   const rows=delPivot.map(r=>{const o={}; for(const [k,label] of DEL_PIVOT) o[label]=k==="TOTAL"?r.TOTAL:r[k]; return o;});

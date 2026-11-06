@@ -108,7 +108,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
 
   <section id="upload">
     <h2>Task upload</h2>
-    <p class="lede">Paste task ids, name the two models, and pick a credential mode. This runs query 400607 and downloads the upload CSV. Language is en_US on every row. Drop a test-accounts CSV to fill the two logins: a row never gets the same account twice, and an email is reused only after every other email has been used the same number of times. Accounts stay in this browser and are written only into the CSV you download. Environment and estimated turns stay blank. Download query saves the SQL if Redash is unavailable.</p>
+    <p class="lede">Paste task ids, name the two models, and pick a credential mode. This runs query 400607 and downloads the upload CSV. Language is en_US on every row. Drop a test-accounts CSV to fill the two logins: a row never gets the same account twice, and an email is reused only after every other email has been used the same number of times. Accounts stay in this browser and are written only into the CSV you download. Every task needs an opening prompt, a rubric, and target deliverables. An aspirational task also needs a universe. Blank environment and estimated turns are fine. Broken tasks are listed after the download, and they sit at the end of the CSV. Download query saves the SQL if Redash is unavailable.</p>
     <div class="card">
       <div class="row">
         <label class="inl">Model A <input type="text" id="upload-model-a" placeholder="Argon Task"></label>
@@ -452,7 +452,7 @@ document.getElementById("merge-go").onclick=()=>{
 document.getElementById("merge-dl").onclick=()=>{ if(merged) download("honeybee_merged.csv", toCSV(merged.headers, merged.rows)); };
 
 /* ---------- task upload (Redash 400607) ---------- */
-let uploadRows=[], uploadHeaders=[], uploadAccounts=[];
+let uploadRows=[], uploadHeaders=[], uploadAccounts=[], uploadMissing=[];
 function loginPlan(n){
   const accounts=uploadAccounts;
   if(!accounts.length) return null;
@@ -497,6 +497,52 @@ function stampUpload(rows){
     }
     return o;
   });
+}
+function blankText(v){
+  const s=v==null?"":String(v).trim();
+  return !s || s.toLowerCase()==="null";
+}
+function filledList(v){
+  if(blankText(v)) return false;
+  const s=String(v).trim();
+  if(s==="[]" || s==="{}") return false;
+  let parsed;
+  try{ parsed=JSON.parse(s); }catch(e){ return true; }
+  if(!Array.isArray(parsed)) return true;
+  return parsed.some(item=>{
+    if(item==null || item==="") return false;
+    if(typeof item==="string") return item.trim()!=="";
+    if(typeof item==="object"){
+      const title=String(item.title||"").trim();
+      const id=String(item.criterion_id||item.id||"").trim();
+      return title!=="" || id!=="";
+    }
+    return true;
+  });
+}
+function uploadIssues(row){
+  const issues=[];
+  if(blankText(row.opening_prompt)) issues.push("opening prompt");
+  if(!filledList(row.target_deliverables)) issues.push("target deliverables");
+  if(!filledList(row.rubric_criteria)) issues.push("rubric");
+  if(/aspirational/i.test(row.task_type||"") && blankText(row.universe)) issues.push("universe");
+  return issues;
+}
+function orderUpload(rows){
+  const good=[], bad=[];
+  for(const r of rows) (uploadIssues(r).length?bad:good).push(r);
+  return good.concat(bad);
+}
+function drawUpload(stamped, missing){
+  const broken=stamped.filter(r=>uploadIssues(r).length);
+  const shown=broken.map(r=>({og_task_id:r.og_task_id||"", task_type:r.task_type||"", missing:uploadIssues(r).join(", ")}));
+  document.getElementById("upload-out").innerHTML=
+    `<div class="stats"><div class="stat ok"><b>${stamped.length}</b><span>rows</span></div><div class="stat ${broken.length?"bad":"ok"}"><b>${broken.length}</b><span>broken</span></div><div class="stat ${missing.length?"bad":""}"><b>${missing.length}</b><span>ids not returned</span></div></div>`
+    +(missing.length?`<div class="note warn">Not returned: ${esc(missing.join(", "))}</div>`:"")
+    +(broken.length
+      ? `<h3 style="margin:14px 0 6px;font-size:15px">Broken tasks</h3><div id="upload-broken"></div>`
+      : `<div class="note">Every task has an opening prompt, target deliverables, and a rubric. Every aspirational task has a universe.</div>`);
+  if(broken.length) renderRows(document.getElementById("upload-broken"), ["og_task_id","task_type","missing"], shown);
 }
 function uploadHeaderList(){
   const headers=uploadHeaders.filter(h=>h!=="model_c_name"&&h!=="model_d_name");
@@ -555,13 +601,14 @@ document.getElementById("upload-go").onclick=async()=>{
     uploadRows=data.rows;
     const found=new Set(uploadRows.map(r=>(r.og_task_id||"").toLowerCase()));
     const missing=unique.filter(id=>!found.has(id));
+    uploadMissing=missing;
     const headers=uploadHeaderList();
-    const stamped=stampUpload(uploadRows);
-    document.getElementById("upload-out").innerHTML=`<div class="stats"><div class="stat ok"><b>${stamped.length}</b><span>rows</span></div><div class="stat ${missing.length?"bad":""}"><b>${missing.length}</b><span>ids not returned</span></div></div>`
-      +(missing.length?`<div class="note warn">Not returned: ${esc(missing.join(", "))}</div>`:"");
+    const stamped=orderUpload(stampUpload(uploadRows));
+    const broken=stamped.filter(r=>uploadIssues(r).length).length;
+    drawUpload(stamped, missing);
     document.getElementById("upload-dl").disabled=false;
     download("honeybee_task_upload.csv", toCSV(headers, stamped));
-    status.textContent="Downloaded "+stamped.length+" rows. Language is en_US. Credential mode is "+document.getElementById("upload-credential").value+". "+loginNote(stamped.length);
+    status.textContent="Downloaded "+stamped.length+" rows. Language is en_US. Credential mode is "+document.getElementById("upload-credential").value+". "+loginNote(stamped.length)+(broken?" "+broken+" broken "+(broken===1?"task is":"tasks are")+" at the end of the CSV.":" No broken tasks.");
   }catch(e){ status.textContent=e.message; }
   finally{ document.getElementById("upload-go").disabled=false; }
 };
@@ -569,9 +616,11 @@ document.getElementById("upload-dl").onclick=()=>{
   const status=document.getElementById("upload-status");
   if(!uploadRows.length) return;
   try{
-    const stamped=stampUpload(uploadRows);
+    const stamped=orderUpload(stampUpload(uploadRows));
+    const broken=stamped.filter(r=>uploadIssues(r).length).length;
+    drawUpload(stamped, uploadMissing);
     download("honeybee_task_upload.csv", toCSV(uploadHeaderList(), stamped));
-    status.textContent="Downloaded "+stamped.length+" rows. "+loginNote(stamped.length);
+    status.textContent="Downloaded "+stamped.length+" rows. "+loginNote(stamped.length)+(broken?" "+broken+" broken "+(broken===1?"task is":"tasks are")+" at the end of the CSV.":" No broken tasks.");
   }catch(e){ status.textContent=e.message; }
 };
 document.getElementById("upload-sql").onclick=async()=>{

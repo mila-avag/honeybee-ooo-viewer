@@ -70,7 +70,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
 <nav>
   <button data-tab="links" class="active">Link check</button>
   <button data-tab="merge">Merge files</button>
-  <button data-tab="upload">Upload sheet</button>
+  <button data-tab="upload">Task upload</button>
   <button data-tab="batch">Batch progress</button>
   <button data-tab="deliveries">Ultra deliveries</button>
 </nav>
@@ -107,17 +107,15 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
   </section>
 
   <section id="upload">
-    <h2>Upload sheet</h2>
-    <p class="lede">Check a task-upload CSV before anyone uploads it. This is not a delivery sheet. Start from the latest <code>Ultra_Evals_-_task_upload_from_existing_prompts_*.csv</code>.</p>
+    <h2>Task upload</h2>
+    <p class="lede">Paste task ids. This runs query 400607 and downloads the upload CSV. Model names, demo logins, language, environment, estimated turns, and credential mode come back blank on every row. Fill model A and model B before anyone uploads the file.</p>
     <div class="card">
-      <p class="lede" style="margin:0">Allowed columns</p>
-      <div class="mono" id="upload-cols"></div>
+      <textarea id="upload-ids" placeholder="Paste task ids, one per line or separated by commas"></textarea>
       <div class="row" style="margin-top:10px">
-        <button class="b" id="upload-tpl">Download header-only template</button>
-        <button class="b p" id="upload-aliases">Refresh official model names</button>
+        <button class="b p" id="upload-go">Build CSV</button>
+        <button class="b" id="upload-dl" disabled>Download CSV</button>
+        <span class="lede" id="upload-status" style="margin:0"></span>
       </div>
-      <p class="lede" id="alias-status">Model names are checked against the names on the latest attempts. Refresh loads them.</p>
-      <label class="drop" id="upload-drop">Drop the upload CSV here<input type="file" accept=".csv"></label>
       <div id="upload-out"></div>
     </div>
   </section>
@@ -426,74 +424,33 @@ document.getElementById("merge-go").onclick=()=>{
 };
 document.getElementById("merge-dl").onclick=()=>{ if(merged) download("honeybee_merged.csv", toCSV(merged.headers, merged.rows)); };
 
-/* ---------- upload sheet ---------- */
-document.getElementById("upload-cols").textContent=UPLOAD_COLS.join(", ");
-let aliases=new Set();
-document.getElementById("upload-tpl").onclick=()=>download("honeybee_task_upload_template.csv", toCSV(UPLOAD_COLS, []));
-document.getElementById("upload-aliases").onclick=async()=>{
-  const status=document.getElementById("alias-status");
-  status.textContent="Loading saved model names…";
+/* ---------- task upload (Redash 400607) ---------- */
+let uploadRows=[], uploadHeaders=[];
+document.getElementById("upload-go").onclick=async()=>{
+  const status=document.getElementById("upload-status");
+  const ids=(document.getElementById("upload-ids").value.match(/[0-9a-fA-F]{24}/g)||[]);
+  const seen=new Set(), unique=[];
+  for(const id of ids){ const t=id.toLowerCase(); if(!seen.has(t)){ seen.add(t); unique.push(t); } }
+  if(!unique.length){ status.textContent="Paste at least one 24-character task id."; return; }
+  status.textContent="Running query 400607 for "+unique.length+" tasks…";
+  document.getElementById("upload-go").disabled=true;
   try{
-    const data=await runQuery(400628, {max_age:60*60*24*30});
-    aliases=new Set();
-    for(const r of data.rows){
-      for(const k of ["model_a_name","model_b_name"]){
-        const v=(r[k]||"").trim();
-        if(v && !/unnamed/i.test(v)) aliases.add(v);
-      }
-    }
-    status.textContent=aliases.size+" official model names loaded from the live pairs.";
+    const data=await runQuery(400607, {params:{project_id:PROJECT_ID, task_ids:unique.join(",")}});
+    uploadHeaders=data.headers;
+    uploadRows=data.rows;
+    const found=new Set(uploadRows.map(r=>(r.og_task_id||"").toLowerCase()));
+    const missing=unique.filter(id=>!found.has(id));
+    document.getElementById("upload-out").innerHTML=`<div class="stats"><div class="stat ok"><b>${uploadRows.length}</b><span>rows</span></div><div class="stat ${missing.length?"bad":""}"><b>${missing.length}</b><span>ids not returned</span></div></div>`
+      +(missing.length?`<div class="note warn">Not returned: ${esc(missing.join(", "))}</div>`:"");
+    document.getElementById("upload-dl").disabled=false;
+    download("honeybee_task_upload.csv", toCSV(uploadHeaders, uploadRows));
+    status.textContent="Downloaded "+uploadRows.length+" rows. Model name and demo columns are blank.";
   }catch(e){ status.textContent=e.message; }
+  finally{ document.getElementById("upload-go").disabled=false; }
 };
-let uploadTable=null, uploadName="";
-bindDrop(document.getElementById("upload-drop"), async files=>{
-  const file=files[0]; if(!file) return;
-  const drop=document.getElementById("upload-drop");
-  const label=drop.firstChild && drop.firstChild.nodeType===3 ? drop.firstChild.nodeValue : "";
-  try{
-    setDropText(drop, "Reading "+file.name+"…");
-    uploadTable=await readCSV(file, {onProgress:(p,n)=>setDropText(drop, "Reading "+file.name+" · "+Math.round(p*100)+"% · "+n+" rows")});
-    uploadName=file.name;
-    drawUpload();
-  }catch(e){ alert(e.message); }
-  finally{ setDropText(drop, label); }
-});
-function drawUpload(){
-  const H=uploadTable.headers, issues=[];
-  if(/delivery_sender_preview|chatdeliverybatch/i.test(uploadName) || H.some(h=>/^(model_a_link|model_b_link|link_a|link_b|product_a|product_b)$/i.test(h)))
-    issues.push(["bad","This looks like a delivery sheet, not a task upload. Do not upload it as tasks."]);
-  const extra=H.filter(h=>!UPLOAD_COLS.includes(h));
-  if(extra.length) issues.push(["bad","Columns that are not in the upload shape: "+extra.join(", ")]);
-  const miss=["opening_prompt","model_a_name","model_b_name"].filter(h=>!H.includes(h));
-  if(miss.length) issues.push(["warn","Missing columns: "+miss.join(", ")]);
-  if(!aliases.size) issues.push(["warn","Official model names are not loaded, so names were not checked. Press Refresh official model names first."]);
-  const rowIssues=[];
-  uploadTable.rows.forEach((r,i)=>{
-    const p=[];
-    if("og_task_id" in r){
-      const v=(r.og_task_id||"").trim();
-      if(!v) p.push("og_task_id blank");
-      else if(!/^[0-9a-f]{24}$/i.test(v)) p.push("og_task_id is not 24 hex characters");
-    }
-    if((r.model_c_name||"").trim()||(r.model_d_name||"").trim()) p.push("model C or D is set. L1 is A and B only");
-    for(const k of ["model_a_name","model_b_name"]){
-      const v=(r[k]||"").trim();
-      if(!v) p.push(k+" blank");
-      else if(aliases.size && !aliases.has(v)) p.push(k+" “"+v+"” is not a live model name");
-    }
-    if(!(r.opening_prompt||"").trim()) p.push("opening_prompt blank");
-    if(p.length) rowIssues.push({row:String(i+2), og_task_id:r.og_task_id||"", issues:p.join("; ")});
-  });
-  if(H.some(h=>/password/i.test(h)) && uploadTable.rows.some(r=>(r.demo_password||r.demo_password_b||"").trim()))
-    issues.push(["warn","Demo passwords are filled. Keep this file on your laptop."]);
-  const host=document.getElementById("upload-out");
-  host.innerHTML=`<div class="stats"><div class="stat"><b>${uploadTable.rows.length}</b><span>rows</span></div><div class="stat ${rowIssues.length?"bad":"ok"}"><b>${rowIssues.length}</b><span>rows with problems</span></div></div>`
-    +issues.map(([k,t])=>`<div class="note ${k}">${esc(t)}</div>`).join("")
-    +(issues.length||rowIssues.length?"":`<div class="note">Looks good.</div>`)
-    +`<div id="upload-rows"></div><div class="row" style="margin-top:8px"><button class="b" id="upload-clean">Download with only the allowed columns</button></div>`;
-  if(rowIssues.length) renderRows(document.getElementById("upload-rows"), ["row","og_task_id","issues"], rowIssues);
-  document.getElementById("upload-clean").onclick=()=>download(uploadName.replace(/\.csv$/i,"")+"_clean.csv", toCSV(UPLOAD_COLS.filter(h=>H.includes(h)), uploadTable.rows));
-}
+document.getElementById("upload-dl").onclick=()=>{
+  if(uploadRows.length) download("honeybee_task_upload.csv", toCSV(uploadHeaders, uploadRows));
+};
 
 /* ---------- batch progress ---------- */
 let batchRows=[];

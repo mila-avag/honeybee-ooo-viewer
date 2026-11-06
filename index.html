@@ -114,7 +114,7 @@ python3 honeybee_viewer_server.py</pre>
     <div class="card">
       <h3>Task upload</h3>
       <p><b>When.</b> You have a list of task ids and need the upload CSV for them.</p>
-      <p><b>Need.</b> Model A and Model B names, a credential mode (single or double), and the task ids. The Redash server, unless you use Download query and run the SQL on data source 30. For logins, export <a href="https://docs.google.com/spreadsheets/d/1_TILTW4KthPz1-fysSRlEeV04lYA0m8qznVyz9vCVig/edit?gid=1552775865#gid=1552775865" target="_blank" rel="noopener">the test accounts sheet</a> as a CSV with Accounts and Password columns. If you need more demo accounts, reach out to @kevin chen.</p>
+      <p><b>Need.</b> Model A and Model B names, a credential mode (single or dual), and the task ids. The Redash server, unless you use Download query and run the SQL on data source 30. For logins, export <a href="https://docs.google.com/spreadsheets/d/1_TILTW4KthPz1-fysSRlEeV04lYA0m8qznVyz9vCVig/edit?gid=1552775865#gid=1552775865" target="_blank" rel="noopener">the test accounts sheet</a> as a CSV with Accounts and Password columns. If you need more demo accounts, reach out to @kevin chen.</p>
       <p><b>You get.</b> <code>honeybee_task_upload.csv</code>. Language is en_US on every row. Up to 5,000 ids. Demo logins are filled from the accounts file: the two logins on a row are different accounts, and emails are repeated as little as possible. Accounts stay in the browser and are written only into the CSV you download.</p>
       <p><b>Checks.</b> Every task needs an opening prompt, a rubric, and target deliverables. An aspirational task also needs a universe. Blank environment and estimated turns are fine. Broken tasks are listed on the page and placed at the end of the CSV.</p>
     </div>
@@ -177,7 +177,7 @@ python3 honeybee_viewer_server.py</pre>
         <label class="inl">Credential mode
           <select id="upload-credential">
             <option value="single" selected>single</option>
-            <option value="double">double</option>
+            <option value="dual">dual</option>
           </select>
         </label>
       </div>

@@ -124,10 +124,11 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
 
   <section id="batch">
     <h2>Batch progress</h2>
-    <p class="lede">How many tasks of each Model A / Model B pair are in each review layer right now. An open layer is the pending review node. Completed means the task is finished and nothing is waiting. Refresh reads this from Redash. The first load takes a few minutes.</p>
+    <p class="lede">How many tasks of each Model A / Model B pair are in each review layer right now. An open layer is the pending review node. Completed means the task is finished and nothing is waiting. Load saved result is the last Redash run. Recompute scans the project and takes about 10 minutes.</p>
     <div class="card">
       <div class="row">
-        <button class="b p" id="batch-go">Refresh</button>
+        <button class="b p" id="batch-go">Load saved result</button>
+        <button class="b" id="batch-fresh">Recompute (about 10 min)</button>
         <button class="b" id="batch-dl" disabled>Download CSV</button>
         <span class="lede" id="batch-status" style="margin:0"></span>
       </div>
@@ -141,8 +142,8 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
     <p class="lede">The pivot from query 390037. Every model pair is included.</p>
     <div class="card">
       <div class="row">
-        <button class="b p" id="del-go">Refresh</button>
-        <button class="b" id="del-cached">Load saved result</button>
+        <button class="b p" id="del-cached">Load saved result</button>
+        <button class="b" id="del-go">Recompute (about 10 min)</button>
         <button class="b" id="del-pivot-dl" disabled>Download CSV</button>
         <span class="lede" id="del-status" style="margin:0"></span>
       </div>
@@ -302,6 +303,7 @@ document.querySelectorAll("nav button").forEach(b=>{
     document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active", x===b));
     document.querySelectorAll("main section").forEach(s=>s.classList.toggle("on", s.id===b.dataset.tab));
     if(b.dataset.tab==="deliveries" && !delRows.length) loadDeliveries(false);
+    if(b.dataset.tab==="batch" && !batchRows.length) loadBatch(false);
   };
 });
 
@@ -430,9 +432,9 @@ let aliases=new Set();
 document.getElementById("upload-tpl").onclick=()=>download("honeybee_task_upload_template.csv", toCSV(UPLOAD_COLS, []));
 document.getElementById("upload-aliases").onclick=async()=>{
   const status=document.getElementById("alias-status");
-  status.textContent="Loading model names. This usually takes a few minutes…";
+  status.textContent="Loading saved model names…";
   try{
-    const data=await runQuery(400628);
+    const data=await runQuery(400628, {max_age:60*60*24*30});
     aliases=new Set();
     for(const r of data.rows){
       for(const k of ["model_a_name","model_b_name"]){
@@ -495,12 +497,13 @@ function drawUpload(){
 
 /* ---------- batch progress ---------- */
 let batchRows=[];
-document.getElementById("batch-go").onclick=async()=>{
+async function loadBatch(fresh){
   const status=document.getElementById("batch-status");
-  status.textContent="Reading the live queue. This usually takes a few minutes…";
+  status.textContent=fresh?"Recomputing in Redash. This takes about 10 minutes.":"Loading the saved result…";
   document.getElementById("batch-go").disabled=true;
+  document.getElementById("batch-fresh").disabled=true;
   try{
-    const data=await runQuery(400628);
+    const data=await runQuery(400628, {max_age: fresh?0:60*60*24*30});
     const levels=["L-1","L0","L1","L4","L8","L10","L11","L12","Completed","Not open","other"];
     const pairs=new Map();
     let total=0;
@@ -525,10 +528,16 @@ document.getElementById("batch-go").onclick=async()=>{
       const o={}; for(const h of headers) o[h]=r[h]||0; o.model_a_name=r.model_a_name; o.model_b_name=r.model_b_name; return o;
     }));
     document.getElementById("batch-dl").disabled=false;
-    status.textContent="Updated just now.";
+    const when=data.retrieved_at?new Date(data.retrieved_at).toLocaleString():"";
+    status.textContent=fresh?"Updated just now.":(when?("Saved result from "+when+"."):"Saved result loaded.");
   }catch(e){ status.textContent=e.message; }
-  finally{ document.getElementById("batch-go").disabled=false; }
-};
+  finally{
+    document.getElementById("batch-go").disabled=false;
+    document.getElementById("batch-fresh").disabled=false;
+  }
+}
+document.getElementById("batch-go").onclick=()=>loadBatch(false);
+document.getElementById("batch-fresh").onclick=()=>loadBatch(true);
 document.getElementById("batch-dl").onclick=()=>{
   const headers=["model_a_name","model_b_name","L-1","L0","L1","L4","L8","L10","L11","L12","Completed","Not open","other","total"];
   download("honeybee_batch_progress.csv", toCSV(headers, batchRows));
@@ -574,7 +583,7 @@ function drawDeliveries(){
 }
 async function loadDeliveries(fresh){
   const status=document.getElementById("del-status");
-  status.textContent=fresh?"Refreshing query 390037. This can take several minutes…":"Loading the saved result…";
+  status.textContent=fresh?"Recomputing in Redash. This takes about 10 minutes.":"Loading the saved result…";
   document.getElementById("del-go").disabled=true;
   document.getElementById("del-cached").disabled=true;
   try{

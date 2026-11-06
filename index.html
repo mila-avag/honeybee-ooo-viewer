@@ -72,7 +72,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
   <button data-tab="merge">Merge files</button>
   <button data-tab="upload">Upload sheet</button>
   <button data-tab="batch">Batch progress</button>
-  <button data-tab="deliveries">Deliveries</button>
+  <button data-tab="deliveries">Ultra deliveries</button>
 </nav>
 <main>
   <section id="links" class="on">
@@ -486,14 +486,14 @@ const DEL_HIDE=new Set([
   "Gemini Pro > Model Beetle"
 ]);
 const DEL_PIVOT=[
-  ["MODEL_A_NAME","Model A"],
-  ["MODEL_B_NAME","Model B"],
-  ["PENDING_TO_DELIVER","Pending to deliver"],
-  ["PENDING_IN_ATTEMPT","Pending in attempt"],
-  ["DELIVERED_LAST_21D","Delivered last 21d"],
-  ["DELIVERED_PLUS_PENDING","Delivered + pending"],
-  ["MODEL_A_TOTAL_MINS_PER_TASK","Model A mins / task"],
-  ["PAIR_TOTAL_MINS_PER_TASK","Pair mins / task"],
+  ["MODEL_A_NAME","MODEL_A_NAME"],
+  ["MODEL_B_NAME","MODEL_B_NAME"],
+  ["PENDING_TO_DELIVER","PENDING_TO_DELIVER"],
+  ["PENDING_IN_ATTEMPT","PENDING_IN_ATTEMPT"],
+  ["DELIVERED_LAST_21D","DELIVERED_LAST_21D"],
+  ["DELIVERED_PLUS_PENDING","DELIVERED_PLUS_PENDING"],
+  ["MODEL_A_TOTAL_MINS_PER_TASK","MODEL_A_TOTAL_MINS_PER_TASK"],
+  ["PAIR_TOTAL_MINS_PER_TASK","PAIR_TOTAL_MINS_PER_TASK"],
   ["TOTAL","Total"]
 ];
 function num(v){ const n=Number(v); return Number.isFinite(n)?n:0; }
@@ -518,7 +518,7 @@ function drawDeliveries(){
     for(const [k,label] of DEL_PIVOT) o[label]=k==="TOTAL"?r.TOTAL:r[k];
     return o;
   });
-  pivotRows.push(Object.assign({["Model A"]:"Total"}, Object.fromEntries(pivotHeaders.slice(1,-1).map(h=>[h,""])), {Total:total}));
+  pivotRows.push(Object.assign({MODEL_A_NAME:"Total"}, Object.fromEntries(pivotHeaders.slice(1,-1).map(h=>[h,""])), {Total:total}));
   renderRows(document.getElementById("del-pivot"), pivotHeaders, pivotRows);
   renderRows(document.getElementById("del-table"), delHeaders, delRows);
   const sum=k=>delRows.reduce((s,r)=>s+num(r[k]),0);

@@ -124,7 +124,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
 
   <section id="batch">
     <h2>Batch progress</h2>
-    <p class="lede">How many tasks of each Model A / Model B pair are in each review layer right now. An open layer is the pending review node. Completed means the task is finished and nothing is waiting. Load saved result is the last Redash run. Recompute scans the project and takes about 10 minutes.</p>
+    <p class="lede">Tasks still open, by model pair and review layer. Finished tasks are left out. Load saved result is the last Redash run. Recompute scans the project and takes about 10 minutes.</p>
     <div class="card">
       <div class="row">
         <button class="b p" id="batch-go">Load saved result</button>
@@ -139,7 +139,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
 
   <section id="deliveries">
     <h2>Ultra deliveries</h2>
-    <p class="lede">The pivot from query 390037. Every model pair is included.</p>
+    <p class="lede">Delivered means sent in the last 21 days, or completed in that window and never sent. Pending review is a task sitting at L8, L10, or L12. Still in attempt means it has not left the attempt layer. Minutes per task is the average of all time spent on the task. Model A minutes repeat on every row for that model.</p>
     <div class="card">
       <div class="row">
         <button class="b p" id="del-cached">Load saved result</button>
@@ -504,25 +504,26 @@ async function loadBatch(fresh){
   document.getElementById("batch-fresh").disabled=true;
   try{
     const data=await runQuery(400628, {max_age: fresh?0:60*60*24*30});
-    const levels=["L-1","L0","L1","L4","L8","L10","L11","L12","Completed","Not open","other"];
+    const levels=["L-1","L0","L1","L4","L8","L10","L11","L12","Not open","other"];
     const pairs=new Map();
     let total=0;
     for(const r of data.rows){
+      if((r.review_level_label||"")==="Completed") continue;
       const a=(r.model_a_name||"").trim()||"A (unnamed)";
       const b=(r.model_b_name||"").trim()||"B (unnamed)";
       const key=a+"  vs  "+b;
       const n=Number(r.task_count)||0;
       const lvl=Number(r.review_level);
-      const known={"L-1":1,L0:1,L1:1,L4:1,L8:1,L10:1,L11:1,L12:1,Completed:1,"Not open":1};
+      const known={"L-1":1,L0:1,L1:1,L4:1,L8:1,L10:1,L11:1,L12:1,"Not open":1};
       const label=known[r.review_level_label] ? r.review_level_label : ([-1,0,1,4,8,10,11,12].includes(lvl) ? "L"+lvl : "other");
-      if(!pairs.has(key)) pairs.set(key, {model_a_name:a, model_b_name:b, "L-1":0,L0:0,L1:0,L4:0,L8:0,L10:0,L11:0,L12:0,Completed:0,"Not open":0,other:0,total:0});
+      if(!pairs.has(key)) pairs.set(key, {model_a_name:a, model_b_name:b, "L-1":0,L0:0,L1:0,L4:0,L8:0,L10:0,L11:0,L12:0,"Not open":0,other:0,total:0});
       const row=pairs.get(key);
       row[label]+=n; row.total+=n; total+=n;
     }
-    batchRows=[...pairs.values()].sort((x,y)=>y.total-x.total);
+    batchRows=[...pairs.values()].filter(r=>r.total>0).sort((x,y)=>y.total-x.total);
     const sum={};
     for(const lv of levels) sum[lv]=batchRows.reduce((s,r)=>s+r[lv],0);
-    document.getElementById("batch-stats").innerHTML=`<div class="stats"><div class="stat"><b>${total}</b><span>tasks</span></div><div class="stat"><b>${batchRows.length}</b><span>model pairs</span></div><div class="stat"><b>${sum.L8}</b><span>open L8</span></div><div class="stat"><b>${sum.L10}</b><span>open L10</span></div><div class="stat"><b>${sum.L12}</b><span>open L12</span></div><div class="stat"><b>${sum.Completed}</b><span>completed</span></div></div>`;
+    document.getElementById("batch-stats").innerHTML=`<div class="stats"><div class="stat"><b>${total}</b><span>open tasks</span></div><div class="stat"><b>${batchRows.length}</b><span>model pairs</span></div><div class="stat"><b>${sum.L8}</b><span>open L8</span></div><div class="stat"><b>${sum.L10}</b><span>open L10</span></div><div class="stat"><b>${sum.L12}</b><span>open L12</span></div><div class="stat"><b>${sum["L-1"]}</b><span>open L-1</span></div></div>`;
     const headers=["model_a_name","model_b_name",...levels,"total"];
     renderRows(document.getElementById("batch-table"), headers, batchRows.map(r=>{
       const o={}; for(const h of headers) o[h]=r[h]||0; o.model_a_name=r.model_a_name; o.model_b_name=r.model_b_name; return o;
@@ -539,22 +540,22 @@ async function loadBatch(fresh){
 document.getElementById("batch-go").onclick=()=>loadBatch(false);
 document.getElementById("batch-fresh").onclick=()=>loadBatch(true);
 document.getElementById("batch-dl").onclick=()=>{
-  const headers=["model_a_name","model_b_name","L-1","L0","L1","L4","L8","L10","L11","L12","Completed","Not open","other","total"];
+  const headers=["model_a_name","model_b_name","L-1","L0","L1","L4","L8","L10","L11","L12","Not open","other","total"];
   download("honeybee_batch_progress.csv", toCSV(headers, batchRows));
 };
 
 /* ---------- deliveries (Redash 390037, pivot 672678) ---------- */
 let delRows=[], delPivot=[];
 const DEL_PIVOT=[
-  ["MODEL_A_NAME","MODEL_A_NAME"],
-  ["MODEL_B_NAME","MODEL_B_NAME"],
-  ["PENDING_TO_DELIVER","PENDING_TO_DELIVER"],
-  ["PENDING_IN_ATTEMPT","PENDING_IN_ATTEMPT"],
-  ["DELIVERED_LAST_21D","DELIVERED_LAST_21D"],
-  ["DELIVERED_PLUS_PENDING","DELIVERED_PLUS_PENDING"],
-  ["MODEL_A_TOTAL_MINS_PER_TASK","MODEL_A_TOTAL_MINS_PER_TASK"],
-  ["PAIR_TOTAL_MINS_PER_TASK","PAIR_TOTAL_MINS_PER_TASK"],
-  ["TOTAL","Total"]
+  ["MODEL_A_NAME","Model A"],
+  ["MODEL_B_NAME","Model B"],
+  ["DELIVERED_LAST_21D","Delivered, last 21 days"],
+  ["PENDING_TO_DELIVER","Pending review (L8, L10, L12)"],
+  ["DELIVERED_PLUS_PENDING","Delivered + pending review"],
+  ["PENDING_IN_ATTEMPT","Still in attempt"],
+  ["MODEL_A_TOTAL_MINS_PER_TASK","Model A minutes per task"],
+  ["PAIR_TOTAL_MINS_PER_TASK","Pair minutes per task"],
+  ["TOTAL","Total tasks"]
 ];
 function num(v){ const n=Number(v); return Number.isFinite(n)?n:0; }
 function drawDeliveries(){
@@ -577,7 +578,9 @@ function drawDeliveries(){
     for(const [k,label] of DEL_PIVOT) o[label]=k==="TOTAL"?r.TOTAL:r[k];
     return o;
   });
-  pivotRows.push(Object.assign({MODEL_A_NAME:"Total"}, Object.fromEntries(pivotHeaders.slice(1,-1).map(h=>[h,""])), {Total:total}));
+  const totalRow={};
+  pivotHeaders.forEach((h,i)=>{ totalRow[h]=i===0?"Total":(h===pivotHeaders[pivotHeaders.length-1]?total:""); });
+  pivotRows.push(totalRow);
   renderRows(document.getElementById("del-pivot"), pivotHeaders, pivotRows);
   document.getElementById("del-pivot-dl").disabled=false;
 }

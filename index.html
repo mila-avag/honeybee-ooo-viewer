@@ -172,29 +172,76 @@ function download(name, text){
   a.href=URL.createObjectURL(b); a.download=name; document.body.appendChild(a); a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();}, 400);
 }
-function parseCSV(text){
-  if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
-  const rows=[]; let row=[], f="", i=0, q=false;
-  while(i<text.length){
-    const c=text[i];
-    if(q){
-      if(c==='"'){ if(text[i+1]==='"'){f+='"'; i+=2; continue;} q=false; i++; continue; }
-      f+=c; i++; continue;
-    }
-    if(c==='"'){q=true; i++; continue;}
-    if(c===","){row.push(f); f=""; i++; continue;}
-    if(c==="\r"){i++; continue;}
-    if(c==="\n"){row.push(f); rows.push(row); row=[]; f=""; i++; continue;}
-    f+=c; i++;
+/* READCSV_START */
+async function readCSV(file, opts){
+  opts=opts||{};
+  const keep=opts.keep?new Set(opts.keep.map(s=>s.toLowerCase())):null;
+  const maxCell=opts.maxCell==null?262144:opts.maxCell;
+  const reader=file.stream().getReader();
+  const dec=new TextDecoder("utf-8");
+  let quoted=false, field="", skip="", row=[], rows=[], headers=null, keepIdx=null, bom=true, bytes=0, lastPaint=0, trimmed=0;
+  const total=file.size||1;
+  function arm(){
+    if(keepIdx && headers && !keepIdx[row.length]) skip="keep";
   }
-  if(f!==""||row.length){row.push(f); rows.push(row);}
-  while(rows.length && rows[rows.length-1].length===1 && rows[rows.length-1][0]==="") rows.pop();
-  const headers=(rows.shift()||[]).map(h=>h.trim());
-  return {headers, rows:rows.map(r=>{const o={}; headers.forEach((h,k)=>{o[h]=r[k]!==undefined?r[k]:"";}); return o;})};
+  function endField(){
+    if(skip==="size") trimmed++;
+    row.push(skip?"":field);
+    field=""; skip="";
+  }
+  function endRow(){
+    endField();
+    if(row.length===1 && row[0]===""){ row=[]; arm(); return; }
+    if(!headers){
+      headers=row.map(h=>h.replace(/^\uFEFF/,"").trim());
+      keepIdx=keep?headers.map(h=>keep.has(h.toLowerCase().replace(/\s+/g,"_"))):null;
+      row=[]; arm(); return;
+    }
+    const o={};
+    headers.forEach((h,i)=>{ if(!keepIdx || keepIdx[i]) o[h]=row[i]||""; });
+    rows.push(o);
+    row=[];
+    arm();
+  }
+  function feed(text){
+    for(let i=0;i<text.length;i++){
+      let c=text[i];
+      if(bom){ bom=false; if(c==="\uFEFF") continue; }
+      if(quoted){
+        if(c==='"'){
+          if(text[i+1]==='"'){ if(!skip) field+='"'; i++; continue; }
+          quoted=false; continue;
+        }
+        if(!skip){ field+=c; if(field.length>maxCell){ skip="size"; field=""; } }
+        continue;
+      }
+      if(c==='"'){ quoted=true; continue; }
+      if(c===","){ endField(); arm(); continue; }
+      if(c==="\r") continue;
+      if(c==="\n"){ endRow(); continue; }
+      if(!skip){ field+=c; if(field.length>maxCell){ skip="size"; field=""; } }
+    }
+  }
+  while(true){
+    const step=await reader.read();
+    if(step.done) break;
+    bytes+=step.value.byteLength;
+    feed(dec.decode(step.value,{stream:true}));
+    if(opts.onProgress && bytes-lastPaint>2*1024*1024){
+      lastPaint=bytes;
+      opts.onProgress(Math.min(0.99, bytes/total), rows.length);
+      await new Promise(r=>setTimeout(r,0));
+    }
+  }
+  feed(dec.decode());
+  if(quoted || field!=="" || row.length) endRow();
+  const outHeaders=(headers||[]).filter((h,i)=>!keepIdx || keepIdx[i]);
+  return {headers:outHeaders, rows, trimmed};
 }
-async function readFile(file){
-  if(file.size>400*1024*1024) throw new Error(file.name+" is too big for the browser (over 400 MB). Filter it first, then drop the smaller file.");
-  return await file.text();
+/* READCSV_END */
+function setDropText(el, text){
+  const n=el.firstChild;
+  if(n && n.nodeType===3) n.nodeValue=text;
 }
 function col(headers, names){
   const map=new Map(headers.map(h=>[h.toLowerCase().replace(/\s+/g,"_"), h]));
@@ -299,10 +346,14 @@ function tally(key){
   for(const r of linkRows){ const s=r[key]||"(blank name)"; c[s]=(c[s]||0)+1; }
   return c;
 }
+const LINK_KEEP=["task_id","task","model_a_name","product_a","model_b_name","product_b","model_a_link","link_a","model_b_link","link_b"];
 bindDrop(document.getElementById("link-drop"), async files=>{
   const file=files[0]; if(!file) return;
+  const drop=document.getElementById("link-drop");
+  const label=drop.firstChild && drop.firstChild.nodeType===3 ? drop.firstChild.nodeValue : "";
   try{
-    const table=parseCSV(await readFile(file));
+    setDropText(drop, "Reading "+file.name+"…");
+    const table=await readCSV(file, {keep:LINK_KEEP, onProgress:(p,n)=>setDropText(drop, "Reading "+file.name+" · "+Math.round(p*100)+"% · "+n+" rows")});
     const id=col(table.headers,["task_id","task"]);
     const an=col(table.headers,["model_a_name","product_a"]);
     const bn=col(table.headers,["model_b_name","product_b"]);
@@ -323,6 +374,7 @@ bindDrop(document.getElementById("link-drop"), async files=>{
     document.getElementById("link-file").textContent=file.name+" · "+linkRows.length+" rows";
     drawLinks();
   }catch(e){ alert(e.message); }
+  finally{ setDropText(drop, label); }
 });
 document.getElementById("link-problems").onchange=drawLinks;
 document.getElementById("link-dl").onclick=()=>download("honeybee_link_check.csv", toCSV(LINK_HEADERS, linkRows));
@@ -337,12 +389,17 @@ function drawMergeFiles(){
   document.getElementById("merge-go").disabled=mergeFiles.length<1;
 }
 bindDrop(document.getElementById("merge-drop"), async files=>{
+  const drop=document.getElementById("merge-drop");
+  const label=drop.firstChild && drop.firstChild.nodeType===3 ? drop.firstChild.nodeValue : "";
   try{
     for(const file of files){
-      mergeFiles.push({name:file.name, table:parseCSV(await readFile(file))});
+      setDropText(drop, "Reading "+file.name+"…");
+      const table=await readCSV(file, {onProgress:(p,n)=>setDropText(drop, "Reading "+file.name+" · "+Math.round(p*100)+"% · "+n+" rows")});
+      mergeFiles.push({name:file.name, table});
     }
     drawMergeFiles();
   }catch(e){ alert(e.message); }
+  finally{ setDropText(drop, label); }
 });
 document.getElementById("merge-clear").onclick=()=>{ mergeFiles=[]; merged=null; document.getElementById("merge-dl").disabled=true; document.getElementById("merge-stats").innerHTML=""; drawMergeFiles(); };
 document.getElementById("merge-go").onclick=()=>{
@@ -389,8 +446,15 @@ document.getElementById("upload-aliases").onclick=async()=>{
 let uploadTable=null, uploadName="";
 bindDrop(document.getElementById("upload-drop"), async files=>{
   const file=files[0]; if(!file) return;
-  try{ uploadTable=parseCSV(await readFile(file)); uploadName=file.name; drawUpload(); }
-  catch(e){ alert(e.message); }
+  const drop=document.getElementById("upload-drop");
+  const label=drop.firstChild && drop.firstChild.nodeType===3 ? drop.firstChild.nodeValue : "";
+  try{
+    setDropText(drop, "Reading "+file.name+"…");
+    uploadTable=await readCSV(file, {onProgress:(p,n)=>setDropText(drop, "Reading "+file.name+" · "+Math.round(p*100)+"% · "+n+" rows")});
+    uploadName=file.name;
+    drawUpload();
+  }catch(e){ alert(e.message); }
+  finally{ setDropText(drop, label); }
 });
 function drawUpload(){
   const H=uploadTable.headers, issues=[];

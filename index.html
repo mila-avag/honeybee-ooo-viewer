@@ -19,7 +19,7 @@ header p{margin:4px 0 0;opacity:.88;font-size:13px}
 nav{display:flex;gap:6px;padding:10px 16px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2}
 nav button{border:0;background:transparent;color:var(--mid);font:inherit;font-weight:600;padding:8px 12px;border-radius:8px;cursor:pointer}
 nav button.active{background:var(--tint);color:var(--accent)}
-main{max-width:1100px;margin:0 auto;padding:20px 16px 48px}
+main{max-width:1280px;margin:0 auto;padding:20px 16px 48px}
 section{display:none}section.on{display:block}
 h2{margin:0 0 6px;font-size:20px}
 .lede{color:var(--mid);margin:0 0 14px}
@@ -72,6 +72,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
   <button data-tab="merge">Merge files</button>
   <button data-tab="upload">Upload sheet</button>
   <button data-tab="batch">Batch progress</button>
+  <button data-tab="deliveries">Deliveries</button>
 </nav>
 <main>
   <section id="links" class="on">
@@ -132,6 +133,25 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
       </div>
       <div id="batch-stats"></div>
       <div id="batch-table"></div>
+    </div>
+  </section>
+
+  <section id="deliveries">
+    <h2>Ultra deliveries</h2>
+    <p class="lede">Query 390037, Ultra Deliveries October. Delivered in the last 21 days, still pending at L8, L10, or L12, and still in attempt, by model pair. The pivot is the same one saved on that query: it sums Total and hides the older model A names.</p>
+    <div class="card">
+      <div class="row">
+        <button class="b p" id="del-go">Refresh</button>
+        <button class="b" id="del-cached">Load saved result</button>
+        <button class="b" id="del-dl" disabled>Download query CSV</button>
+        <button class="b" id="del-pivot-dl" disabled>Download pivot CSV</button>
+        <span class="lede" id="del-status" style="margin:0"></span>
+      </div>
+      <div id="del-stats"></div>
+      <h3 style="margin:16px 0 6px;font-size:16px">Pivot table</h3>
+      <div id="del-pivot"></div>
+      <h3 style="margin:16px 0 6px;font-size:16px">Query</h3>
+      <div id="del-table"></div>
     </div>
   </section>
 </main>
@@ -239,6 +259,7 @@ document.querySelectorAll("nav button").forEach(b=>{
   b.onclick=()=>{
     document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active", x===b));
     document.querySelectorAll("main section").forEach(s=>s.classList.toggle("on", s.id===b.dataset.tab));
+    if(b.dataset.tab==="deliveries" && !delRows.length) loadDeliveries(false);
   };
 });
 
@@ -260,12 +281,12 @@ async function detectProxy(){
   proxyBase="";
   label.textContent="Redash: not connected. Link check, merge, and the upload check still work. Refresh needs python3 honeybee_viewer_server.py, then open http://127.0.0.1:8765.";
 }
-async function runQuery(qid){
+async function runQuery(qid, extra){
   if(!proxyBase) throw new Error("Refresh needs the local server. In Terminal, from honeybee_qc/ooo_handoff/viewer, run: python3 honeybee_viewer_server.py. Then open http://127.0.0.1:8765 and press Refresh again. The key stays on this laptop.");
-  const r=await fetch(proxyBase+"/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({qid, params:{project_id:PROJECT_ID}})});
+  const r=await fetch(proxyBase+"/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({qid, params:{project_id:PROJECT_ID}}, extra||{}))});
   const j=await r.json();
   if(!r.ok||j.error) throw new Error(j.error||("HTTP "+r.status));
-  return {headers:j.columns, rows:j.rows.map(row=>Object.fromEntries(j.columns.map((c,i)=>[c, row[i]==null?"":String(row[i])])))};
+  return {headers:j.columns, retrieved_at:j.retrieved_at||"", rows:j.rows.map(row=>Object.fromEntries(j.columns.map((c,i)=>[c, row[i]==null?"":String(row[i])])))};
 }
 
 /* ---------- link check ---------- */
@@ -452,6 +473,84 @@ document.getElementById("batch-go").onclick=async()=>{
 document.getElementById("batch-dl").onclick=()=>{
   const headers=["model_a_name","model_b_name","L-1","L0","L1","L4","L8","L10","L11","L12","Completed","Not open","other","total"];
   download("honeybee_batch_progress.csv", toCSV(headers, batchRows));
+};
+
+/* ---------- deliveries (Redash 390037, pivot 672678) ---------- */
+let delRows=[], delHeaders=[], delPivot=[];
+const DEL_HIDE=new Set([
+  "Gemini 3.8 Flash Extended Thinking (custom)",
+  "GPT 5.6 Terra Medium",
+  "Gemini 4 Candidate",
+  "Gemini Flash (Model Beetle)",
+  "Gemini Base",
+  "Gemini Pro > Model Beetle"
+]);
+const DEL_PIVOT=[
+  ["MODEL_A_NAME","Model A"],
+  ["MODEL_B_NAME","Model B"],
+  ["PENDING_TO_DELIVER","Pending to deliver"],
+  ["PENDING_IN_ATTEMPT","Pending in attempt"],
+  ["DELIVERED_LAST_21D","Delivered last 21d"],
+  ["DELIVERED_PLUS_PENDING","Delivered + pending"],
+  ["MODEL_A_TOTAL_MINS_PER_TASK","Model A mins / task"],
+  ["PAIR_TOTAL_MINS_PER_TASK","Pair mins / task"],
+  ["TOTAL","Total"]
+];
+function num(v){ const n=Number(v); return Number.isFinite(n)?n:0; }
+function drawDeliveries(){
+  const shown=delRows.filter(r=>!DEL_HIDE.has((r.MODEL_A_NAME||"").trim()));
+  const groups=new Map();
+  for(const r of shown){
+    const key=DEL_PIVOT.slice(0,-1).map(([k])=>r[k]||"").join("\u0001");
+    if(!groups.has(key)){
+      const row={};
+      for(const [k] of DEL_PIVOT) row[k]=r[k]||"";
+      row.TOTAL=0;
+      groups.set(key, row);
+    }
+    groups.get(key).TOTAL+=num(r.TOTAL);
+  }
+  delPivot=[...groups.values()].sort((a,b)=>DEL_PIVOT.slice(0,-1).map(([k])=>String(a[k])).join("\u0001").localeCompare(DEL_PIVOT.slice(0,-1).map(([k])=>String(b[k])).join("\u0001")));
+  const total=delPivot.reduce((s,r)=>s+num(r.TOTAL),0);
+  const pivotHeaders=DEL_PIVOT.map(([,label])=>label);
+  const pivotRows=delPivot.map(r=>{
+    const o={};
+    for(const [k,label] of DEL_PIVOT) o[label]=k==="TOTAL"?r.TOTAL:r[k];
+    return o;
+  });
+  pivotRows.push(Object.assign({["Model A"]:"Total"}, Object.fromEntries(pivotHeaders.slice(1,-1).map(h=>[h,""])), {Total:total}));
+  renderRows(document.getElementById("del-pivot"), pivotHeaders, pivotRows);
+  renderRows(document.getElementById("del-table"), delHeaders, delRows);
+  const sum=k=>delRows.reduce((s,r)=>s+num(r[k]),0);
+  document.getElementById("del-stats").innerHTML=`<div class="stats"><div class="stat"><b>${delRows.length}</b><span>pairs in the query</span></div><div class="stat"><b>${shown.length}</b><span>pairs in the pivot</span></div><div class="stat ok"><b>${sum("DELIVERED_LAST_21D")}</b><span>delivered, 21d</span></div><div class="stat"><b>${sum("PENDING_TO_DELIVER")}</b><span>pending L8–L12</span></div><div class="stat"><b>${sum("PENDING_IN_ATTEMPT")}</b><span>pending in attempt</span></div></div>`;
+  document.getElementById("del-dl").disabled=false;
+  document.getElementById("del-pivot-dl").disabled=false;
+}
+async function loadDeliveries(fresh){
+  const status=document.getElementById("del-status");
+  status.textContent=fresh?"Refreshing query 390037. This can take several minutes…":"Loading the saved result…";
+  document.getElementById("del-go").disabled=true;
+  document.getElementById("del-cached").disabled=true;
+  try{
+    const data=await runQuery(390037, {max_age: fresh?0:60*60*24*30});
+    delHeaders=data.headers;
+    delRows=data.rows;
+    drawDeliveries();
+    const when=data.retrieved_at?new Date(data.retrieved_at).toLocaleString():"";
+    status.textContent=fresh?"Updated just now.":(when?("Saved result from "+when+"."):"Saved result loaded.");
+  }catch(e){ status.textContent=e.message; }
+  finally{
+    document.getElementById("del-go").disabled=false;
+    document.getElementById("del-cached").disabled=false;
+  }
+}
+document.getElementById("del-go").onclick=()=>loadDeliveries(true);
+document.getElementById("del-cached").onclick=()=>loadDeliveries(false);
+document.getElementById("del-dl").onclick=()=>download("ultra_deliveries.csv", toCSV(delHeaders, delRows));
+document.getElementById("del-pivot-dl").onclick=()=>{
+  const headers=DEL_PIVOT.map(([,label])=>label);
+  const rows=delPivot.map(r=>{const o={}; for(const [k,label] of DEL_PIVOT) o[label]=k==="TOTAL"?r.TOTAL:r[k]; return o;});
+  download("ultra_deliveries_pivot.csv", toCSV(headers, rows));
 };
 
 detectProxy();

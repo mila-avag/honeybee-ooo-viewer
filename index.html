@@ -124,7 +124,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
 
   <section id="batch">
     <h2>Batch progress</h2>
-    <p class="lede">Tasks still open, by model pair and review layer. Finished tasks are left out. Load saved result is the last Redash run. Recompute scans the project and takes about 10 minutes.</p>
+    <p class="lede">Tasks still pending, by model pair and review layer. Finished tasks and paused tasks are left out. Load saved result is the last Redash run. Recompute scans the project and takes about 10 minutes.</p>
     <div class="card">
       <div class="row">
         <button class="b p" id="batch-go">Load saved result</button>
@@ -508,7 +508,7 @@ async function loadBatch(fresh){
     const pairs=new Map();
     let total=0;
     for(const r of data.rows){
-      if((r.review_level_label||"")==="Completed") continue;
+      if((r.review_level_label||"")==="Completed" || (r.review_level_label||"")==="Paused") continue;
       const a=(r.model_a_name||"").trim()||"A (unnamed)";
       const b=(r.model_b_name||"").trim()||"B (unnamed)";
       const key=a+"  vs  "+b;

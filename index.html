@@ -25,6 +25,8 @@ h2{margin:0 0 6px;font-size:20px}
 h3{margin:0 0 6px;font-size:16px}
 .help p{margin:0 0 8px}
 .help p:last-child{margin:0}
+ul.explain{margin:8px 0 0;padding-left:18px}
+ul.explain li{margin:0 0 6px}
 pre{margin:0 0 8px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow:auto;font-family:var(--mono);font-size:12px;white-space:pre-wrap}
 .lede{color:var(--mid);margin:0 0 14px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:0 0 14px}
@@ -84,16 +86,17 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
 <main>
   <section id="help" class="on help">
     <h2>Instructions</h2>
-    <p class="lede">What each tab is for, when to use it, and what you need.</p>
+    <p class="lede">Each tab says what it reads, the order it decides in, and what it leaves out. The same explanation sits on the tab itself, next to the button.</p>
 
     <div class="card">
       <h3>What you need</h3>
-      <p>Link check and Merge files run in the browser. A CSV is enough.</p>
-      <p>Task upload, Batch progress, and Ultra deliveries read Redash through a server on your laptop. The key stays in <code>~/.cursor/redash.env</code> and never enters the page.</p>
+      <p>Link check and Merge files never call Redash. The CSV stays in this browser. A delivery file can be multiple GB because of <code>debug_info</code> columns. Link check reads the file in a stream and keeps only the id, the two names, and the two links.</p>
+      <p>Build CSV, Load saved result, and Recompute call Snowflake through a server on your laptop. The page sends a query id. The server reads the key from <code>~/.cursor/redash.env</code> and attaches it. The key is not in this page, the HTML, or the downloaded file.</p>
       <pre>cd honeybee_qc/ooo_handoff/viewer
 python3 honeybee_viewer_server.py</pre>
-      <p>Open <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a>. The header says “Redash: connected” when the server is up. The same server also serves the hosted page.</p>
-      <p>Each of those three tabs has <b>Download query</b>. That saves the SQL so someone can run it in Redash when the key is down. Task upload uses data source 30. Batch progress and Ultra deliveries use data source 22.</p>
+      <p>Open <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a>. The purple header is the connection check. “Redash: connected” means the server answered and the key loaded. The hosted page can use that same server. GitHub Pages itself cannot hold the key, so a hosted-only visit can still do Link check, Merge files, and Download query.</p>
+      <p><b>Download query</b> fetches the SQL file that sits next to this page and saves it. It does not run Snowflake. Task upload is data source 30, the same source as saved query 400607. The download fills in the task ids you pasted. It does not edit query 400607. Batch progress and Ultra deliveries are data source 22. Ultra deliveries is saved query 390037.</p>
+      <p><b>Load saved result</b> returns the last finished warehouse run. That is a read of a stored result, usually under a second. <b>Recompute</b> runs the SQL again and replaces that stored result. On this project that scan is about 10 minutes. Use Recompute when the queue has moved and the saved time in the status line is too old.</p>
     </div>
 
     <div class="card">
@@ -101,14 +104,24 @@ python3 honeybee_viewer_server.py</pre>
       <p><b>When.</b> You have a delivery sheet and need to confirm each model’s link matches the model name.</p>
       <p><b>Need.</b> A delivery CSV. The file can be multiple GB. Only the task id, model names, and links are kept.</p>
       <p><b>You get.</b> Task id, model A and B names and links, and a flag for each side. Problems only is on by default. Download CSV keeps every row.</p>
-      <p>A name with <b>gpt</b> needs <code>https://chatgpt.com/s…</code>. <b>claude</b> or <b>fable</b> needs <code>https://claude.ai/share/</code>. <b>argon</b> needs the public <code>scale-cds-public-us-west-2</code> S3 host. <b>gemini</b>, when the name is not argon, needs <code>https://share.gemini.google/</code>. A link that starts with <code>[No trajectory link</code> is NO LINK AVAILABLE. A blank link is MISSING LINK. A name that matches none of those is WRONG LINK.</p>
+      <p>The flag is decided in this order, and the first match wins. A later rule never gets a chance to override an earlier one.</p>
+      <ul class="explain">
+        <li>An empty name produces a blank flag. The row still shows under Problems only, because a blank flag is not OK.</li>
+        <li>A name with an empty link is MISSING LINK.</li>
+        <li>A link whose text starts with <code>[No trajectory link</code> is NO LINK AVAILABLE. That is a filled-in placeholder, so it is a different failure from a blank cell.</li>
+        <li>A name containing <b>gpt</b> must start with <code>https://chatgpt.com/s</code>. That covers both <code>/s/</code> and <code>/share/</code>. <code>chatgpt.com/c</code> is WRONG LINK.</li>
+        <li>Otherwise a name containing <b>claude</b> or <b>fable</b> must start with <code>https://claude.ai/share/</code>.</li>
+        <li>Otherwise a name containing <b>argon</b> must start with <code>https://scale-cds-public-us-west-2.s3.amazonaws.com/</code>. Argon is checked before Gemini so “Gemini Argon” is an Argon link.</li>
+        <li>Otherwise a name containing <b>gemini</b> must start with <code>https://share.gemini.google/</code>. <code>gemini.google.com</code> is WRONG LINK.</li>
+        <li>A name that matches none of those classes is WRONG LINK, including N/A, even when the URL itself looks fine.</li>
+      </ul>
     </div>
 
     <div class="card">
       <h3>Merge files</h3>
       <p><b>When.</b> The same tasks are split across two or more CSVs and you want one row per task.</p>
       <p><b>Need.</b> Two or more CSVs, dropped in the order they should apply. Each file needs a task id column (<code>task_id</code> or <code>task</code>).</p>
-      <p><b>You get.</b> One row per task id. The later file wins, including when a later cell is blank. Columns that only exist in a later file are kept. A single cell over 256 KB is dropped.</p>
+      <p>The merge walks the files from top to bottom. For each row it reads <code>task_id</code> or <code>task</code>. A row with neither is counted and skipped. The first time an id appears, that row is stored. A later row with the same id copies every column from the later file onto the stored row, including a blank cell. A blank in the later file replaces a filled cell from the earlier file. A column that exists only in a later file is added. A single cell over 256 KB is stored as empty so a <code>debug_info</code> blob cannot freeze the browser.</p>
     </div>
 
     <div class="card">
@@ -116,27 +129,52 @@ python3 honeybee_viewer_server.py</pre>
       <p><b>When.</b> You have a list of task ids and need the upload CSV for them.</p>
       <p><b>Need.</b> Model A and Model B names, a credential mode (single or dual), and the task ids. The Redash server, unless you use Download query and run the SQL on data source 30. For logins, export <a href="https://docs.google.com/spreadsheets/d/1_TILTW4KthPz1-fysSRlEeV04lYA0m8qznVyz9vCVig/edit?gid=1552775865#gid=1552775865" target="_blank" rel="noopener">the test accounts sheet</a> as a CSV with Accounts and Password columns. If you need more demo accounts, reach out to @kevin chen.</p>
       <p><b>You get.</b> <code>honeybee_task_upload.csv</code>. Language is en_US on every row. Up to 5,000 ids. Demo logins are filled from the accounts file: the two logins on a row are different accounts, and emails are repeated as little as possible. Accounts stay in the browser and are written only into the CSV you download.</p>
-      <p><b>Checks.</b> Every task needs an opening prompt, a rubric, and target deliverables. An aspirational task also needs a universe. Blank environment and estimated turns are fine. Broken tasks are listed on the page and placed at the end of the CSV.</p>
+      <p>After the rows come back, the page checks each one. A list counts as empty when the cell is blank, <code>null</code>, <code>[]</code>, <code>{}</code>, or a JSON list whose items have no title and no id. A list with one real criterion counts as present.</p>
+      <ul class="explain">
+        <li>Every task needs a non-blank <code>opening_prompt</code>.</li>
+        <li>Every task needs at least one <code>target_deliverables</code> entry.</li>
+        <li>Every task needs at least one <code>rubric_criteria</code> entry.</li>
+        <li>If <code>task_type</code> contains “aspirational”, <code>universe</code> must be non-blank. Any other task type may have an empty universe.</li>
+        <li><code>environment_context</code> and <code>estimated_turns</code> are allowed to be empty. They are never flagged.</li>
+      </ul>
+      <p>A broken row is still in the CSV. Broken rows are moved to the end, and the page lists the task id, the task type, and the missing fields. Ids that Snowflake did not return are listed separately. They have no row to put in the file. The download is not blocked.</p>
+      <p>The credential dropdown writes the word <code>single</code> or <code>dual</code> into <code>credential_mode</code>. It does not change how many logins are filled. When an accounts file is loaded, every row gets two logins, and those two are always different accounts. Accounts are handed out in file order, two per task, then the list starts over. With 2,002 accounts, each account is used once until 1,001 tasks, and after that the busiest account is used only one more time than the quietest. Passwords are written only into the CSV you download. They are not sent to Redash.</p>
     </div>
 
     <div class="card">
       <h3>Batch progress</h3>
       <p><b>When.</b> You want the current count of open tasks by model pair and review layer.</p>
       <p><b>Need.</b> The Redash server. Load saved result returns the last run. Recompute scans the project and takes about 10 minutes. Download query saves the SQL for data source 22.</p>
-      <p><b>You get.</b> One row per model pair, with counts at L-1, L0, L1, L4, L8, L10, L11, L12, and Not open. Completed tasks and paused tasks are left out. The layer is the pending human node, which is where the task is now.</p>
+      <p>The layer is the current pending human node on <code>pipelinev3humannodes</code>, the latest pending row by <code>updated_at</code>. The attempt’s <code>review_level</code> is not used. On this project that column is 0 while <code>attempted_at_review_level</code> is -1, so reading it would show the whole queue as L0.</p>
+      <ul class="explain">
+        <li>A task with a pending node is counted at that node’s level, labeled L-1, L0, L1, L4, L8, L10, L11, or L12. A pending node plus a paused node still counts at the pending level.</li>
+        <li>A task whose only open node is paused is labeled Paused and left out of the table.</li>
+        <li>A completed task with no pending node is labeled Completed and left out.</li>
+        <li>Anything else is Not open: no pending node, and the task is not completed.</li>
+      </ul>
+      <p>Model A is prefiller <code>9f5365db7f5d</code> when that slot is filled. Older tasks leave it empty and put the name in instruction step <code>22e13d3d5d87</code>, and the page keeps the text before “ — Enter each turn”. Prefiller <code>646efa3f869f</code> is the older slot and is used only when both of those are empty. Model B is prefiller <code>88fdb8d4174c</code>. A pair whose remaining tasks are all completed or paused disappears, because its total would be 0.</p>
     </div>
 
     <div class="card">
       <h3>Ultra deliveries</h3>
       <p><b>When.</b> You want the delivery pivot: what went out recently, what is still in review, and what is still in attempt, by model pair.</p>
       <p><b>Need.</b> The Redash server. Load saved result returns the last run. Recompute takes about 10 minutes. Download query saves the SQL for data source 22.</p>
-      <p><b>You get.</b> One row per model pair. Delivered means sent in the last 21 days, or completed in that window and never sent. Pending review is a task at L8, L10, or L12. Still in attempt means it has not left the attempt layer. Minutes per task is the average of all time spent on the task. Model A minutes repeat on every row for that model.</p>
+      <p>This is saved query 390037 on data source 22. The old Redash pivot hid some model A values. This table does not. Every pair in the result is shown. The window is Pacific time.</p>
+      <ul class="explain">
+        <li><b>Delivered, last 21 days.</b> Sent in a delivery batch in the last 21 days, or completed in that window and never present in any sent batch.</li>
+        <li><b>Pending review (L8, L10, L12).</b> The task is sitting at one of those three review levels.</li>
+        <li><b>Delivered + pending review.</b> Those two counts added together.</li>
+        <li><b>Still in attempt.</b> The task has not left the attempt layer. Its pending review level is -1.</li>
+        <li><b>Model A minutes per task.</b> Average of all time spent on tasks for that model A. The same number repeats on every row for that model A, because it is a property of model A, not of the pair.</li>
+        <li><b>Pair minutes per task.</b> Average time spent on tasks in this model A and model B pair.</li>
+        <li><b>Total tasks.</b> Delivered, plus pending review, plus still in attempt. The Total row at the bottom sums this column only. The other columns are left blank on that row so a sum of averages is not presented as a real total.</li>
+      </ul>
     </div>
   </section>
 
   <section id="links">
     <h2>Link check</h2>
-    <p class="lede">Drop a delivery sheet. You get the model names, the links, and a flag for each side: OK, WRONG LINK, MISSING LINK, or NO LINK AVAILABLE.</p>
+    <p class="lede">Drop a delivery sheet. For each side the page reads the model name, then the link, and stops at the first rule that applies. Problems only hides rows where both sides are OK. Download CSV still contains every row. A multi-GB file is fine: the reader keeps <code>task_id</code> / <code>task</code>, <code>model_a_name</code> / <code>product_a</code>, <code>model_b_name</code> / <code>product_b</code>, <code>model_a_link</code> / <code>link_a</code>, and <code>model_b_link</code> / <code>link_b</code>, and never loads the <code>debug_info</code> columns.</p>
     <div class="card">
       <label class="drop" id="link-drop">Drop a delivery CSV here, or click to browse<input type="file" accept=".csv"></label>
       <div id="link-stats"></div>
@@ -147,12 +185,23 @@ python3 honeybee_viewer_server.py</pre>
       </div>
       <div id="link-table"></div>
     </div>
-    <div class="note">A name with <b>gpt</b> needs <code>https://chatgpt.com/s…</code>. <b>claude</b> or <b>fable</b> needs <code>https://claude.ai/share/</code>. <b>argon</b> needs the public <code>scale-cds-public-us-west-2</code> S3 host. <b>gemini</b> (and not argon) needs <code>https://share.gemini.google/</code>. A link that starts with <code>[No trajectory link</code> is NO LINK AVAILABLE. A blank link is MISSING LINK.</div>
+    <div class="note">The check runs in this order. The first match wins.
+      <ul class="explain">
+        <li>Empty name: the flag is blank. Problems only still shows the row, because blank is not OK.</li>
+        <li>Name present, link empty: MISSING LINK.</li>
+        <li>Link text starts with <code>[No trajectory link</code>: NO LINK AVAILABLE. That cell is filled in. It is a different failure from a blank cell.</li>
+        <li>Name contains <b>gpt</b>: the link must start with <code>https://chatgpt.com/s</code>. That covers <code>/s/</code> and <code>/share/</code>. <code>chatgpt.com/c</code> is WRONG LINK.</li>
+        <li>Else name contains <b>claude</b> or <b>fable</b>: the link must start with <code>https://claude.ai/share/</code>.</li>
+        <li>Else name contains <b>argon</b>: the link must start with <code>https://scale-cds-public-us-west-2.s3.amazonaws.com/</code>. Argon is tested before Gemini, so “Gemini Argon” is an Argon link.</li>
+        <li>Else name contains <b>gemini</b>: the link must start with <code>https://share.gemini.google/</code>. <code>gemini.google.com</code> is WRONG LINK.</li>
+        <li>A name that matches none of those, including N/A, is WRONG LINK even when the URL looks fine.</li>
+      </ul>
+    </div>
   </section>
 
   <section id="merge">
     <h2>Merge files</h2>
-    <p class="lede">Drop two or more CSVs in the order they should apply. Each task id appears once. The later file wins. New columns from later files are kept.</p>
+    <p class="lede">Drop two or more CSVs in the order they should apply. The page walks them from first to last. It keys each row on <code>task_id</code> or <code>task</code>. A row with neither is counted and skipped. The first time an id appears, that row is kept. A later row with the same id copies every cell from the later file onto it, including a blank. A blank in the later file replaces a value from the earlier file. A column that exists only in a later file is added. A cell over 256 KB is stored empty, which is how a <code>debug_info</code> column is dropped.</p>
     <div class="card">
       <label class="drop" id="merge-drop">Drop CSVs here, or click to add them<input type="file" accept=".csv" multiple></label>
       <ol class="files" id="merge-files"></ol>
@@ -169,7 +218,7 @@ python3 honeybee_viewer_server.py</pre>
     <h2>Task upload</h2>
     <p style="margin:0 0 8px"><a class="sheet-cta" href="https://docs.google.com/spreadsheets/d/1_TILTW4KthPz1-fysSRlEeV04lYA0m8qznVyz9vCVig/edit?gid=1552775865#gid=1552775865" target="_blank" rel="noopener">📊 Test accounts sheet</a></p>
     <p class="lede" style="margin-top:0">If you need more demo accounts, reach out to @kevin chen.</p>
-    <p class="lede">Paste task ids, name the two models, and pick a credential mode. This runs query 400607 and downloads the upload CSV. Language is en_US on every row. Drop a test-accounts CSV to fill the two logins: a row never gets the same account twice, and an email is reused only after every other email has been used the same number of times. Accounts stay in this browser and are written only into the CSV you download. Every task needs an opening prompt, a rubric, and target deliverables. An aspirational task also needs a universe. Blank environment and estimated turns are fine. Broken tasks are listed after the download, and they sit at the end of the CSV. Download query saves the SQL if Redash is unavailable.</p>
+    <p class="lede">Build CSV sends the pasted ids to a copy of query 400607 on data source 30. It does not edit the saved query. The page then writes <code>languageCode</code> as en_US, the two model names, and <code>credential_mode</code> as the word single or dual. The dropdown only writes that word. It does not change how many logins are filled. Download CSV writes those fields again from the form, without running Snowflake a second time. Download query saves the SQL with your ids already inside the IN list.</p>
     <div class="card">
       <div class="row">
         <label class="inl">Model A <input type="text" id="upload-model-a" placeholder="Argon Task"></label>
@@ -192,11 +241,29 @@ python3 honeybee_viewer_server.py</pre>
       </div>
       <div id="upload-out"></div>
     </div>
+    <div class="note">What gets flagged, after the rows come back. A list is empty when the cell is blank, <code>null</code>, <code>[]</code>, <code>{}</code>, or a JSON list whose items have no title and no id.
+      <ul class="explain">
+        <li>Every task needs a non-blank opening prompt, at least one target deliverable, and at least one rubric criterion.</li>
+        <li>If task type contains “aspirational”, universe must be non-blank. Any other task type may have an empty universe.</li>
+        <li>Environment and estimated turns are allowed to be empty. They are never flagged.</li>
+        <li>Broken rows stay in the file and are moved to the end. The list under the buttons names the task id and the missing fields. Ids Snowflake did not return have no row, so they are listed on their own. The download is not blocked.</li>
+        <li>With an accounts file, each row gets two different accounts, handed out in file order, two per task, then the list starts over. The same account is never both logins on one row. Passwords are written only into the CSV you download. They are not sent to Redash. With 2,002 accounts, each account is used once through 1,001 tasks.</li>
+      </ul>
+    </div>
   </section>
 
   <section id="batch">
     <h2>Batch progress</h2>
-    <p class="lede">Tasks still pending, by model pair and review layer. Finished tasks and paused tasks are left out. Load saved result is the last Redash run. Recompute scans the project and takes about 10 minutes.</p>
+    <p class="lede">One row per model pair. The count is tasks whose current human node is pending. Load saved result reads the last finished run and does not scan Snowflake. Recompute runs the SQL again and replaces that result. On this project that takes about 10 minutes. Download query saves the SQL for data source 22.</p>
+    <div class="note">The layer is the latest pending row on <code>pipelinev3humannodes</code>. The attempt’s <code>review_level</code> is not read. On this project that column is 0 while the task is still in attempt, so using it would show the whole queue as L0.
+      <ul class="explain">
+        <li>A pending node is counted at its level: L-1, L0, L1, L4, L8, L10, L11, or L12. A task that also has a paused node still counts at the pending level.</li>
+        <li>A task whose only open node is paused is labeled Paused and left out.</li>
+        <li>A completed task with no pending node is labeled Completed and left out.</li>
+        <li>No pending node, and the task is not completed: Not open.</li>
+        <li>Model A is prefiller <code>9f5365db7f5d</code>. If that slot is empty, the name is the instruction step <code>22e13d3d5d87</code> up to “ — Enter each turn”. Prefiller <code>646efa3f869f</code> is used only when both of those are empty. Model B is prefiller <code>88fdb8d4174c</code>.</li>
+      </ul>
+    </div>
     <div class="card">
       <div class="row">
         <button class="b p" id="batch-go">Load saved result</button>
@@ -212,7 +279,18 @@ python3 honeybee_viewer_server.py</pre>
 
   <section id="deliveries">
     <h2>Ultra deliveries</h2>
-    <p class="lede">Delivered means sent in the last 21 days, or completed in that window and never sent. Pending review is a task sitting at L8, L10, or L12. Still in attempt means it has not left the attempt layer. Minutes per task is the average of all time spent on the task. Model A minutes repeat on every row for that model.</p>
+    <p class="lede">Saved query 390037 on data source 22. Load saved result reads the last finished run. Recompute runs it again, about 10 minutes, and replaces that result. The old Redash pivot hid some model A values. This table does not. Every pair in the result is shown. The window is Pacific time.</p>
+    <div class="note">
+      <ul class="explain">
+        <li><b>Delivered, last 21 days.</b> Sent in a delivery batch in the last 21 days, or completed in that window and never present in any sent batch.</li>
+        <li><b>Pending review (L8, L10, L12).</b> Sitting at one of those three levels.</li>
+        <li><b>Delivered + pending review.</b> Those two counts added together.</li>
+        <li><b>Still in attempt.</b> Pending review level is -1. The task has not left the attempt layer.</li>
+        <li><b>Model A minutes per task.</b> Average time for that model A, repeated on every row of that model. It is a property of model A, not of the pair.</li>
+        <li><b>Pair minutes per task.</b> Average time for this model A and model B pair.</li>
+        <li><b>Total tasks.</b> Delivered, plus pending review, plus still in attempt. The Total row sums this column only. The other cells on that row are blank so a sum of averages is not shown as a total.</li>
+      </ul>
+    </div>
     <div class="card">
       <div class="row">
         <button class="b p" id="del-cached">Load saved result</button>
@@ -225,7 +303,7 @@ python3 honeybee_viewer_server.py</pre>
     </div>
   </section>
 </main>
-<footer>Project 6a567b80aaa4d140131eae6c. Sheets stay in this browser. Refresh uses the local proxy on this laptop, so the Redash key never enters the page.</footer>
+<footer>Project 6a567b80aaa4d140131eae6c. A CSV you drop stays in this browser. Snowflake buttons go through the local server, which is the only place the Redash key is read.</footer>
 
 <script>
 "use strict";
@@ -404,12 +482,12 @@ async function detectProxy(){
     try{
       const r=await fetch(base+"/api/health",{cache:"no-store"});
       const j=await r.json();
-      if(j.ok && j.key_loaded){ proxyBase=base; label.textContent="Redash: connected. Refresh works."; return; }
-      if(j.ok){ label.textContent="Local server is up, but it has no Redash key in ~/.cursor/redash.env."; return; }
+      if(j.ok && j.key_loaded){ proxyBase=base; label.textContent="Redash: connected. Build CSV, Load saved result, and Recompute can reach Snowflake. The key stays in ~/.cursor/redash.env on this laptop."; return; }
+      if(j.ok){ label.textContent="The local server is up, but ~/.cursor/redash.env has no Redash key, so Snowflake buttons will fail. Link check, Merge files, and Download query still work."; return; }
     }catch(e){}
   }
   proxyBase="";
-  label.textContent="Redash: not connected. Link check, merge, and the upload check still work. Refresh needs python3 honeybee_viewer_server.py, then open http://127.0.0.1:8765.";
+  label.textContent="Redash: not connected. Link check and Merge files work on a CSV in the browser. Build CSV, Load saved result, and Recompute need python3 honeybee_viewer_server.py, then http://127.0.0.1:8765. Download query still saves the SQL.";
 }
 async function runQuery(qid, extra){
   if(!proxyBase) throw new Error("Refresh needs the local server. In Terminal, from honeybee_qc/ooo_handoff/viewer, run: python3 honeybee_viewer_server.py. Then open http://127.0.0.1:8765 and press Refresh again. The key stays on this laptop.");

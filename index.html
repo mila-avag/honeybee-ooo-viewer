@@ -108,7 +108,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
 
   <section id="upload">
     <h2>Task upload</h2>
-    <p class="lede">Paste task ids, name the two models, and pick a credential mode. This runs query 400607 and downloads the upload CSV. Language is en_US on every row. Demo logins, environment, and estimated turns stay blank.</p>
+    <p class="lede">Paste task ids, name the two models, and pick a credential mode. This runs query 400607 and downloads the upload CSV. Language is en_US on every row. Drop a test-accounts CSV to fill the two logins: a row never gets the same account twice, and an email is reused only after every other email has been used the same number of times. Accounts stay in this browser and are written only into the CSV you download. Environment and estimated turns stay blank. Download query saves the SQL if Redash is unavailable.</p>
     <div class="card">
       <div class="row">
         <label class="inl">Model A <input type="text" id="upload-model-a" placeholder="Argon Task"></label>
@@ -121,9 +121,12 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
         </label>
       </div>
       <textarea id="upload-ids" placeholder="Paste task ids, one per line or separated by commas"></textarea>
+      <label class="drop" id="upload-accounts" style="margin-top:10px">Drop a test-accounts CSV (Accounts, Password), or click to browse<input type="file" accept=".csv"></label>
+      <p class="lede" id="upload-accounts-status" style="margin:8px 0 0"></p>
       <div class="row" style="margin-top:10px">
         <button class="b p" id="upload-go">Build CSV</button>
         <button class="b" id="upload-dl" disabled>Download CSV</button>
+        <button class="b" id="upload-sql">Download query</button>
         <span class="lede" id="upload-status" style="margin:0"></span>
       </div>
       <div id="upload-out"></div>
@@ -138,6 +141,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
         <button class="b p" id="batch-go">Load saved result</button>
         <button class="b" id="batch-fresh">Recompute (about 10 min)</button>
         <button class="b" id="batch-dl" disabled>Download CSV</button>
+        <button class="b" id="batch-sql">Download query</button>
         <span class="lede" id="batch-status" style="margin:0"></span>
       </div>
       <div id="batch-stats"></div>
@@ -153,6 +157,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
         <button class="b p" id="del-cached">Load saved result</button>
         <button class="b" id="del-go">Recompute (about 10 min)</button>
         <button class="b" id="del-pivot-dl" disabled>Download CSV</button>
+        <button class="b" id="del-sql">Download query</button>
         <span class="lede" id="del-status" style="margin:0"></span>
       </div>
       <div id="del-pivot"></div>
@@ -175,11 +180,23 @@ function toCSV(headers, rows){
   for(const r of rows) out.push(headers.map(h=>csvCell(r[h])).join(","));
   return out.join("\r\n")+"\r\n";
 }
-function download(name, text){
-  const b=new Blob([text],{type:"text/csv;charset=utf-8"});
+function downloadText(name, text, type){
+  const b=new Blob([text],{type:type||"text/plain;charset=utf-8"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(b); a.download=name; document.body.appendChild(a); a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();}, 400);
+}
+function download(name, text){ downloadText(name, text, "text/csv;charset=utf-8"); }
+async function fetchSql(file){
+  const r=await fetch("sql/"+file,{cache:"no-store"});
+  if(!r.ok) throw new Error("Could not load sql/"+file+". Open the hosted page, or the local server, so the query file is next to the page.");
+  return r.text();
+}
+function pastedTaskIds(){
+  const ids=(document.getElementById("upload-ids").value.match(/[0-9a-fA-F]{24}/g)||[]);
+  const seen=new Set(), unique=[];
+  for(const id of ids){ const t=id.toLowerCase(); if(!seen.has(t)){ seen.add(t); unique.push(t); } }
+  return unique;
 }
 /* READCSV_START */
 async function readCSV(file, opts){
@@ -435,12 +452,34 @@ document.getElementById("merge-go").onclick=()=>{
 document.getElementById("merge-dl").onclick=()=>{ if(merged) download("honeybee_merged.csv", toCSV(merged.headers, merged.rows)); };
 
 /* ---------- task upload (Redash 400607) ---------- */
-let uploadRows=[], uploadHeaders=[];
+let uploadRows=[], uploadHeaders=[], uploadAccounts=[];
+function loginPlan(n){
+  const accounts=uploadAccounts;
+  if(!accounts.length) return null;
+  if(accounts.length<2) throw new Error("Need at least two different accounts so the two logins on a row are never the same.");
+  const uses=new Array(accounts.length).fill(0);
+  const pairs=[];
+  for(let i=0;i<n;i++){
+    const ai=(2*i)%accounts.length;
+    const bi=(2*i+1)%accounts.length;
+    uses[ai]++; uses[bi]++;
+    pairs.push([accounts[ai], accounts[bi]]);
+  }
+  let max=0, used=0;
+  for(const u of uses){ if(u>max) max=u; if(u) used++; }
+  return {pairs, max, used};
+}
+function loginNote(n){
+  if(!uploadAccounts.length) return "Demo logins left blank.";
+  const plan=loginPlan(n);
+  return "Each account is used at most "+(plan.max===1?"once":plan.max+" times")+".";
+}
 function stampUpload(rows){
   const a=document.getElementById("upload-model-a").value.trim();
   const b=document.getElementById("upload-model-b").value.trim();
   const mode=document.getElementById("upload-credential").value;
-  return rows.map(r=>{
+  const plan=loginPlan(rows.length);
+  return rows.map((r,i)=>{
     const o={};
     for(const h of uploadHeaders){
       if(h==="model_c_name"||h==="model_d_name") continue;
@@ -450,24 +489,63 @@ function stampUpload(rows){
     o.model_b_name=b;
     o.languageCode="en_US";
     o.credential_mode=mode;
+    if(plan){
+      o.demo_email=plan.pairs[i][0].email;
+      o.demo_password=plan.pairs[i][0].password;
+      o.demo_email_b=plan.pairs[i][1].email;
+      o.demo_password_b=plan.pairs[i][1].password;
+    }
     return o;
   });
 }
 function uploadHeaderList(){
   const headers=uploadHeaders.filter(h=>h!=="model_c_name"&&h!=="model_d_name");
-  for(const h of ["model_a_name","model_b_name","languageCode","credential_mode"]){
+  for(const h of ["demo_email","demo_password","demo_email_b","demo_password_b","model_a_name","model_b_name","languageCode","credential_mode"]){
     if(!headers.includes(h)) headers.push(h);
   }
   return headers;
 }
+bindDrop(document.getElementById("upload-accounts"), async files=>{
+  const file=files[0]; if(!file) return;
+  const status=document.getElementById("upload-accounts-status");
+  const drop=document.getElementById("upload-accounts");
+  const label=drop.firstChild && drop.firstChild.nodeType===3 ? drop.firstChild.nodeValue : "";
+  try{
+    setDropText(drop, "Reading "+file.name+"…");
+    const table=await readCSV(file);
+    const emailCol=col(table.headers,["accounts","account","email","emails","demo_email","username"]);
+    const passCol=col(table.headers,["password","passwords","pass","demo_password"]);
+    if(!emailCol||!passCol){
+      uploadAccounts=[];
+      status.textContent="This file needs an Accounts column and a Password column. Found: "+table.headers.join(", ");
+      return;
+    }
+    const seen=new Set(), accounts=[];
+    let skipped=0;
+    for(const r of table.rows){
+      const email=cell(r,emailCol), password=cell(r,passCol);
+      if(!email||!password){ skipped++; continue; }
+      const key=email.toLowerCase();
+      if(seen.has(key)){ skipped++; continue; }
+      seen.add(key);
+      accounts.push({email, password});
+    }
+    if(accounts.length<2){
+      uploadAccounts=[];
+      status.textContent="Need at least two different accounts so the two logins on a row are never the same. Found "+accounts.length+".";
+      return;
+    }
+    uploadAccounts=accounts;
+    status.textContent=file.name+" · "+accounts.length+" accounts. The two logins on a row are always different."+(skipped?" "+skipped+" rows skipped.":"");
+  }catch(e){ status.textContent=e.message; }
+  finally{ setDropText(drop, label); }
+});
 document.getElementById("upload-go").onclick=async()=>{
   const status=document.getElementById("upload-status");
   const modelA=document.getElementById("upload-model-a").value.trim();
   const modelB=document.getElementById("upload-model-b").value.trim();
   if(!modelA||!modelB){ status.textContent="Enter a Model A name and a Model B name."; return; }
-  const ids=(document.getElementById("upload-ids").value.match(/[0-9a-fA-F]{24}/g)||[]);
-  const seen=new Set(), unique=[];
-  for(const id of ids){ const t=id.toLowerCase(); if(!seen.has(t)){ seen.add(t); unique.push(t); } }
+  const unique=pastedTaskIds();
   if(!unique.length){ status.textContent="Paste at least one 24-character task id."; return; }
   status.textContent="Running query 400607 for "+unique.length+" tasks…";
   document.getElementById("upload-go").disabled=true;
@@ -483,12 +561,31 @@ document.getElementById("upload-go").onclick=async()=>{
       +(missing.length?`<div class="note warn">Not returned: ${esc(missing.join(", "))}</div>`:"");
     document.getElementById("upload-dl").disabled=false;
     download("honeybee_task_upload.csv", toCSV(headers, stamped));
-    status.textContent="Downloaded "+stamped.length+" rows. Language is en_US. Credential mode is "+document.getElementById("upload-credential").value+".";
+    status.textContent="Downloaded "+stamped.length+" rows. Language is en_US. Credential mode is "+document.getElementById("upload-credential").value+". "+loginNote(stamped.length);
   }catch(e){ status.textContent=e.message; }
   finally{ document.getElementById("upload-go").disabled=false; }
 };
 document.getElementById("upload-dl").onclick=()=>{
-  if(uploadRows.length) download("honeybee_task_upload.csv", toCSV(uploadHeaderList(), stampUpload(uploadRows)));
+  const status=document.getElementById("upload-status");
+  if(!uploadRows.length) return;
+  try{
+    const stamped=stampUpload(uploadRows);
+    download("honeybee_task_upload.csv", toCSV(uploadHeaderList(), stamped));
+    status.textContent="Downloaded "+stamped.length+" rows. "+loginNote(stamped.length);
+  }catch(e){ status.textContent=e.message; }
+};
+document.getElementById("upload-sql").onclick=async()=>{
+  const status=document.getElementById("upload-status");
+  try{
+    let sql=await fetchSql("task_upload.sql");
+    const unique=pastedTaskIds();
+    if(!sql.includes("{{task_ids}}")) throw new Error("This query file has no task id placeholder.");
+    if(unique.length) sql=sql.replace("{{task_ids}}", unique.map(id=>"'"+id+"'").join(",\n    "));
+    downloadText("honeybee_task_upload.sql", sql, "text/plain;charset=utf-8");
+    status.textContent=unique.length
+      ? "Saved the query with "+unique.length+" task ids. Run it on Redash data source 30."
+      : "Saved the query without task ids. Paste ids and download the query again, or replace the placeholder. Run it on data source 30.";
+  }catch(e){ status.textContent=e.message; }
 };
 
 /* ---------- batch progress ---------- */
@@ -535,6 +632,13 @@ async function loadBatch(fresh){
 }
 document.getElementById("batch-go").onclick=()=>loadBatch(false);
 document.getElementById("batch-fresh").onclick=()=>loadBatch(true);
+document.getElementById("batch-sql").onclick=async()=>{
+  const status=document.getElementById("batch-status");
+  try{
+    downloadText("honeybee_batch_progress.sql", await fetchSql("batch_progress.sql"), "text/plain;charset=utf-8");
+    status.textContent="Saved the query. Run it on Redash data source 22.";
+  }catch(e){ status.textContent=e.message; }
+};
 document.getElementById("batch-dl").onclick=()=>{
   const headers=["model_a_name","model_b_name","L-1","L0","L1","L4","L8","L10","L11","L12","Not open","other","total"];
   download("honeybee_batch_progress.csv", toCSV(headers, batchRows));
@@ -599,6 +703,13 @@ async function loadDeliveries(fresh){
 }
 document.getElementById("del-go").onclick=()=>loadDeliveries(true);
 document.getElementById("del-cached").onclick=()=>loadDeliveries(false);
+document.getElementById("del-sql").onclick=async()=>{
+  const status=document.getElementById("del-status");
+  try{
+    downloadText("honeybee_ultra_deliveries.sql", await fetchSql("ultra_deliveries.sql"), "text/plain;charset=utf-8");
+    status.textContent="Saved the query. Run it on Redash data source 22.";
+  }catch(e){ status.textContent=e.message; }
+};
 document.getElementById("del-pivot-dl").onclick=()=>{
   const headers=DEL_PIVOT.map(([,label])=>label);
   const rows=delPivot.map(r=>{const o={}; for(const [k,label] of DEL_PIVOT) o[label]=k==="TOTAL"?r.TOTAL:r[k]; return o;});

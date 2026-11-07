@@ -102,10 +102,10 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
     <div class="card">
       <h3>What you need</h3>
       <p>Link check and Merge files never call Redash. The CSV stays in this browser. A delivery file can be multiple GB because of <code>debug_info</code> columns. Link check reads the file in a stream and keeps only the id, the two names, and the two links.</p>
-      <p>Build CSV, Load saved result, and Recompute call Snowflake through a server on your laptop. The page sends a query id. The server reads the key from <code>~/.cursor/redash.env</code> and attaches it. The key is not in this page, the HTML, or the downloaded file.</p>
+      <p>Build CSV, Load saved result, and Recompute need Redash access. They run through a small helper program that you start on your own computer. The access is set up on that helper, and this page never receives it. Set it up once.</p>
       <pre>cd honeybee_qc/ooo_handoff/viewer
 python3 honeybee_viewer_server.py</pre>
-      <p>Open <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a>. The purple header is the connection check. “Redash: connected” means the server answered and the key loaded. The hosted page can use that same server. GitHub Pages itself cannot hold the key, so a hosted-only visit can still do Link check, Merge files, and Download query.</p>
+      <p>Then open <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a>. The purple header shows the status. “Redash: connected” means the helper is running and has access. The hosted page uses the same helper when it is running. Without it, Link check, Merge files, and Download query still work.</p>
       <p><b>Download query</b> fetches the SQL file that sits next to this page and saves it. It does not run Snowflake. Task upload is data source 30, the same source as saved query 400607. The download fills in the task ids you pasted. It does not edit query 400607. Batch progress and Ultra deliveries are data source 22. Ultra deliveries is saved query 390037.</p>
       <p><b>Load saved result</b> returns the last finished warehouse run. That is a read of a stored result, usually under a second. <b>Recompute</b> runs the SQL again and replaces that stored result. On this project that scan is about 10 minutes. Use Recompute when the queue has moved and the saved time in the status line is too old.</p>
     </div>
@@ -323,7 +323,7 @@ python3 honeybee_viewer_server.py</pre>
     </div>
   </section>
 </main>
-<footer>Project 6a567b80aaa4d140131eae6c. A CSV you drop stays in this browser. Snowflake buttons go through the local server, which is the only place the Redash key is read.</footer>
+<footer>Project 6a567b80aaa4d140131eae6c. A CSV you drop stays in your browser. Snowflake buttons go through the local helper. Redash access is never sent to this page.</footer>
 
 <script>
 "use strict";
@@ -502,15 +502,15 @@ async function detectProxy(){
     try{
       const r=await fetch(base+"/api/health",{cache:"no-store"});
       const j=await r.json();
-      if(j.ok && j.key_loaded){ proxyBase=base; label.textContent="Redash: connected. Build CSV, Load saved result, and Recompute can reach Snowflake. The key stays in ~/.cursor/redash.env on this laptop."; return; }
-      if(j.ok){ label.textContent="The local server is up, but ~/.cursor/redash.env has no Redash key, so Snowflake buttons will fail. Link check, Merge files, and Download query still work."; return; }
+      if(j.ok && j.key_loaded){ proxyBase=base; label.textContent="Redash: connected. Build CSV, Load saved result, and Recompute can run."; return; }
+      if(j.ok){ label.textContent="The helper is running, but Redash access is not set up on it, so Snowflake buttons will fail. Link check, Merge files, and Download query still work."; return; }
     }catch(e){}
   }
   proxyBase="";
-  label.textContent="Redash: not connected. Link check and Merge files work on a CSV in the browser. Build CSV, Load saved result, and Recompute need python3 honeybee_viewer_server.py, then http://127.0.0.1:8765. Download query still saves the SQL.";
+  label.textContent="Redash: not connected. Link check and Merge files work on a CSV in your browser. Build CSV, Load saved result, and Recompute need the helper running. Download query still saves the SQL.";
 }
 async function runQuery(qid, extra){
-  if(!proxyBase) throw new Error("Refresh needs the local server. In Terminal, from honeybee_qc/ooo_handoff/viewer, run: python3 honeybee_viewer_server.py. Then open http://127.0.0.1:8765 and press Refresh again. The key stays on this laptop.");
+  if(!proxyBase) throw new Error("Snowflake buttons need the helper running. Start it with python3 honeybee_viewer_server.py from the viewer folder, then open http://127.0.0.1:8765 and try again.");
   const r=await fetch(proxyBase+"/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({qid, params:{project_id:PROJECT_ID}}, extra||{}))});
   const j=await r.json();
   if(!r.ok||j.error) throw new Error(j.error||("HTTP "+r.status));

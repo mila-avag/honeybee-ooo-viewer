@@ -11,4 +11,4 @@ Open https://mila-avag.github.io/honeybee-ooo-viewer/
 - **Batch progress.** How many tasks of each model pair are in each open review layer. It uses the same latest pending node and metadata names as deliveries. Model A and Model B filters hide rows in the table. Download query saves the SQL for data source 22.
 - **Ultra deliveries.** The pivot from query 390037, with every model pair included. The window starts at 60 days and can be set to a number of weeks. Model A and Model B filters hide rows in the table. Download query saves that SQL.
 
-Link check and merge work in the browser. Refresh needs the local proxy on your laptop (`python3 honeybee_viewer_server.py` in `honeybee_qc/ooo_handoff/viewer`), then open http://127.0.0.1:8765. The Redash key stays on the laptop.
+Link check and merge work in the browser. Snowflake buttons (Build CSV, Load saved result, Recompute) need the helper running on your own computer: `python3 honeybee_viewer_server.py` in `honeybee_qc/ooo_handoff/viewer`, then open http://127.0.0.1:8765. Redash access is set up on that helper and is never sent to the page.

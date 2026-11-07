@@ -145,26 +145,19 @@ python3 honeybee_viewer_server.py</pre>
       <h3>Batch progress</h3>
       <p><b>When.</b> You want the current count of open tasks by model pair and review layer.</p>
       <p><b>Need.</b> The Redash server. Load saved result returns the last run. Recompute scans the project and takes about 10 minutes. Download query saves the SQL for data source 22.</p>
-      <p>The layer is the current pending human node on <code>pipelinev3humannodes</code>, the latest pending row by <code>updated_at</code>. The attempt’s <code>review_level</code> is not used. On this project that column is 0 while <code>attempted_at_review_level</code> is -1, so reading it would show the whole queue as L0.</p>
-      <ul class="explain">
-        <li>A task with a pending node is counted at that node’s level, labeled L-1, L0, L1, L4, L8, L10, L11, or L12. A pending node plus a paused node still counts at the pending level.</li>
-        <li>A task whose only open node is paused is labeled Paused and left out of the table.</li>
-        <li>A completed task with no pending node is labeled Completed and left out.</li>
-        <li>Anything else is Not open: no pending node, and the task is not completed.</li>
-      </ul>
-      <p>Model A is prefiller <code>9f5365db7f5d</code> when that slot is filled. Older tasks leave it empty and put the name in instruction step <code>22e13d3d5d87</code>, and the page keeps the text before “ — Enter each turn”. Prefiller <code>646efa3f869f</code> is the older slot and is used only when both of those are empty. Model B is prefiller <code>88fdb8d4174c</code>. A pair whose remaining tasks are all completed or paused disappears, because its total would be 0.</p>
+      <p>The layer is the latest human node by <code>created_at</code>, the same read as Ultra deliveries. If that node is pending, the task is counted at its level, including L-1 tasks that nobody has attempted yet. Model A and Model B are the task metadata names, with the same renames as the deliveries query. Filters only hide rows in the table already loaded.</p>
     </div>
 
     <div class="card">
       <h3>Ultra deliveries</h3>
       <p><b>When.</b> You want the delivery pivot: what went out recently, what is still in review, and what is still in attempt, by model pair.</p>
       <p><b>Need.</b> The Redash server. Load saved result returns the last run. Recompute takes about 10 minutes. Download query saves the SQL for data source 22.</p>
-      <p>This is saved query 390037 on data source 22. The old Redash pivot hid some model A values. This table does not. Every pair in the result is shown. The window is Pacific time.</p>
+      <p>The window defaults to 60 days. The Lookback menu is in weeks, plus the 60-day choice. Changing it does not rerun Snowflake until you load or recompute. The first run for a window takes about 10 minutes. Later loads of that same window use the saved result. Filters only hide rows in the table already loaded. The window is Pacific time.</p>
       <ul class="explain">
-        <li><b>Delivered, last 21 days.</b> Sent in a delivery batch in the last 21 days, or completed in that window and never present in any sent batch.</li>
-        <li><b>Pending review (L8, L10, L12).</b> The task is sitting at one of those three review levels.</li>
+        <li><b>Delivered.</b> Sent in a delivery batch inside the selected window, or completed in that window and never present in any sent batch.</li>
+        <li><b>Pending review (L8, L10, L12).</b> The latest human node by created_at is pending at one of those three levels.</li>
         <li><b>Delivered + pending review.</b> Those two counts added together.</li>
-        <li><b>Still in attempt.</b> The task has not left the attempt layer. Its pending review level is -1.</li>
+        <li><b>Still in attempt.</b> The latest human node by created_at is pending at -1. Tasks with no attempt yet are included. Batch progress counts this same set as L-1.</li>
         <li><b>Model A minutes per task.</b> Average of all time spent on tasks for that model A. The same number repeats on every row for that model A, because it is a property of model A, not of the pair.</li>
         <li><b>Pair minutes per task.</b> Average time spent on tasks in this model A and model B pair.</li>
         <li><b>Total tasks.</b> Delivered, plus pending review, plus still in attempt. The Total row at the bottom sums this column only. The other columns are left blank on that row so a sum of averages is not presented as a real total.</li>
@@ -267,18 +260,11 @@ python3 honeybee_viewer_server.py</pre>
 
   <section id="batch">
     <h2>Batch progress</h2>
-    <p class="lede">One row per model pair. The count is tasks whose current human node is pending. Load saved result reads the last finished run and does not scan Snowflake. Recompute runs the SQL again and replaces that result. On this project that takes about 10 minutes. Download query saves the SQL for data source 22.</p>
-    <div class="note">The layer is the latest pending row on <code>pipelinev3humannodes</code>. The attempt’s <code>review_level</code> is not read. On this project that column is 0 while the task is still in attempt, so using it would show the whole queue as L0.
-      <ul class="explain">
-        <li>A pending node is counted at its level: L-1, L0, L1, L4, L8, L10, L11, or L12. A task that also has a paused node still counts at the pending level.</li>
-        <li>A task whose only open node is paused is labeled Paused and left out.</li>
-        <li>A completed task with no pending node is labeled Completed and left out.</li>
-        <li>No pending node, and the task is not completed: Not open.</li>
-        <li>Model A is prefiller <code>9f5365db7f5d</code>. If that slot is empty, the name is the instruction step <code>22e13d3d5d87</code> up to “ — Enter each turn”. Prefiller <code>646efa3f869f</code> is used only when both of those are empty. Model B is prefiller <code>88fdb8d4174c</code>.</li>
-      </ul>
-    </div>
+    <p class="lede">One row per model pair. The layer is the latest human node by created_at, the same read as Ultra deliveries. A pending node is counted at that level, including tasks with no attempt yet. Names come from task metadata. Load saved result reads the last finished run of this logic. Recompute scans again and takes a few minutes. Filters hide pairs in the table. They do not rerun Snowflake.</p>
     <div class="card">
       <div class="row">
+        <label class="inl">Model A <select id="batch-filter-a"><option value="">All</option></select></label>
+        <label class="inl">Model B <select id="batch-filter-b"><option value="">All</option></select></label>
         <button class="b p" id="batch-go">Load saved result</button>
         <button class="b" id="batch-fresh">Recompute (about 10 min)</button>
         <button class="b" id="batch-dl" disabled>Download CSV</button>
@@ -292,13 +278,13 @@ python3 honeybee_viewer_server.py</pre>
 
   <section id="deliveries">
     <h2>Ultra deliveries</h2>
-    <p class="lede">Saved query 390037 on data source 22. Load saved result reads the last finished run. Recompute runs it again, about 10 minutes, and replaces that result. The old Redash pivot hid some model A values. This table does not. Every pair in the result is shown. The window is Pacific time.</p>
+    <p class="lede">Same query as 390037 on data source 22, with the lookback you pick. It starts at 60 days. Load saved result returns the last run for that window. The first run of a window takes about 10 minutes. Filters hide pairs in the table already loaded. Changing Lookback applies on the next load.</p>
     <div class="note">
       <ul class="explain">
-        <li><b>Delivered, last 21 days.</b> Sent in a delivery batch in the last 21 days, or completed in that window and never present in any sent batch.</li>
-        <li><b>Pending review (L8, L10, L12).</b> Sitting at one of those three levels.</li>
+        <li><b>Delivered.</b> Sent in a delivery batch inside the selected window, or completed in that window and never present in any sent batch.</li>
+        <li><b>Pending review (L8, L10, L12).</b> The latest human node by created_at is pending at one of those three levels.</li>
         <li><b>Delivered + pending review.</b> Those two counts added together.</li>
-        <li><b>Still in attempt.</b> Pending review level is -1. The task has not left the attempt layer.</li>
+        <li><b>Still in attempt.</b> The latest human node by created_at is pending at -1. Tasks with no attempt yet are included. Batch progress counts this same set as L-1.</li>
         <li><b>Model A minutes per task.</b> Average time for that model A, repeated on every row of that model. It is a property of model A, not of the pair.</li>
         <li><b>Pair minutes per task.</b> Average time for this model A and model B pair.</li>
         <li><b>Total tasks.</b> Delivered, plus pending review, plus still in attempt. The Total row sums this column only. The other cells on that row are blank so a sum of averages is not shown as a total.</li>
@@ -306,6 +292,18 @@ python3 honeybee_viewer_server.py</pre>
     </div>
     <div class="card">
       <div class="row">
+        <label class="inl">Lookback
+          <select id="del-lookback">
+            <option value="14">2 weeks</option>
+            <option value="28">4 weeks</option>
+            <option value="42">6 weeks</option>
+            <option value="60" selected>60 days</option>
+            <option value="84">12 weeks</option>
+            <option value="168">24 weeks</option>
+          </select>
+        </label>
+        <label class="inl">Model A <select id="del-filter-a"><option value="">All</option></select></label>
+        <label class="inl">Model B <select id="del-filter-b"><option value="">All</option></select></label>
         <button class="b p" id="del-cached">Load saved result</button>
         <button class="b" id="del-go">Recompute (about 10 min)</button>
         <button class="b" id="del-pivot-dl" disabled>Download CSV</button>
@@ -843,39 +841,56 @@ document.getElementById("upload-sql").onclick=async()=>{
 };
 
 /* ---------- batch progress ---------- */
-let batchRows=[];
+let batchSource=[], batchRows=[];
+const BATCH_LEVELS=["L-1","L0","L1","L4","L8","L10","L11","L12","Not open","other"];
+function fillFilter(id, values){
+  const sel=document.getElementById(id);
+  const keep=sel.value;
+  const uniq=[...new Set(values.filter(v=>v!==""))].sort((a,b)=>String(a).localeCompare(String(b)));
+  sel.innerHTML=`<option value="">All</option>`+uniq.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
+  if(uniq.includes(keep)) sel.value=keep;
+}
+function drawBatch(){
+  const wantA=document.getElementById("batch-filter-a").value;
+  const wantB=document.getElementById("batch-filter-b").value;
+  const pairs=new Map();
+  let total=0;
+  for(const r of batchSource){
+    if((r.review_level_label||"")==="Completed" || (r.review_level_label||"")==="Paused") continue;
+    const a=(r.model_a_name||"").trim()||"(null)";
+    const b=(r.model_b_name||"").trim()||"(null)";
+    if(wantA && a!==wantA) continue;
+    if(wantB && b!==wantB) continue;
+    const key=a+"  vs  "+b;
+    const n=Number(r.task_count)||0;
+    const lvl=Number(r.review_level);
+    const known={"L-1":1,L0:1,L1:1,L4:1,L8:1,L10:1,L11:1,L12:1,"Not open":1};
+    const label=known[r.review_level_label] ? r.review_level_label : ([-1,0,1,4,8,10,11,12].includes(lvl) ? "L"+lvl : "other");
+    if(!pairs.has(key)) pairs.set(key, {model_a_name:a, model_b_name:b, "L-1":0,L0:0,L1:0,L4:0,L8:0,L10:0,L11:0,L12:0,"Not open":0,other:0,total:0});
+    const row=pairs.get(key);
+    row[label]+=n; row.total+=n; total+=n;
+  }
+  batchRows=[...pairs.values()].filter(r=>r.total>0).sort((x,y)=>y.total-x.total);
+  const sum={};
+  for(const lv of BATCH_LEVELS) sum[lv]=batchRows.reduce((s,r)=>s+r[lv],0);
+  document.getElementById("batch-stats").innerHTML=`<div class="stats"><div class="stat"><b>${total}</b><span>open tasks</span></div><div class="stat"><b>${batchRows.length}</b><span>model pairs</span></div><div class="stat"><b>${sum.L8}</b><span>open L8</span></div><div class="stat"><b>${sum.L10}</b><span>open L10</span></div><div class="stat"><b>${sum.L12}</b><span>open L12</span></div><div class="stat"><b>${sum["L-1"]}</b><span>open L-1</span></div></div>`;
+  const headers=["model_a_name","model_b_name",...BATCH_LEVELS,"total"];
+  renderRows(document.getElementById("batch-table"), headers, batchRows.map(r=>{
+    const o={}; for(const h of headers) o[h]=r[h]||0; o.model_a_name=r.model_a_name; o.model_b_name=r.model_b_name; return o;
+  }));
+  document.getElementById("batch-dl").disabled=batchRows.length===0;
+}
 async function loadBatch(fresh){
   const status=document.getElementById("batch-status");
-  status.textContent=fresh?"Recomputing in Redash. This takes about 10 minutes.":"Loading the saved result…";
+  status.textContent=fresh?"Recomputing in Redash. This takes a few minutes.":"Loading the saved result…";
   document.getElementById("batch-go").disabled=true;
   document.getElementById("batch-fresh").disabled=true;
   try{
     const data=await runQuery(400628, {max_age: fresh?0:60*60*24*30});
-    const levels=["L-1","L0","L1","L4","L8","L10","L11","L12","Not open","other"];
-    const pairs=new Map();
-    let total=0;
-    for(const r of data.rows){
-      if((r.review_level_label||"")==="Completed" || (r.review_level_label||"")==="Paused") continue;
-      const a=(r.model_a_name||"").trim()||"A (unnamed)";
-      const b=(r.model_b_name||"").trim()||"B (unnamed)";
-      const key=a+"  vs  "+b;
-      const n=Number(r.task_count)||0;
-      const lvl=Number(r.review_level);
-      const known={"L-1":1,L0:1,L1:1,L4:1,L8:1,L10:1,L11:1,L12:1,"Not open":1};
-      const label=known[r.review_level_label] ? r.review_level_label : ([-1,0,1,4,8,10,11,12].includes(lvl) ? "L"+lvl : "other");
-      if(!pairs.has(key)) pairs.set(key, {model_a_name:a, model_b_name:b, "L-1":0,L0:0,L1:0,L4:0,L8:0,L10:0,L11:0,L12:0,"Not open":0,other:0,total:0});
-      const row=pairs.get(key);
-      row[label]+=n; row.total+=n; total+=n;
-    }
-    batchRows=[...pairs.values()].filter(r=>r.total>0).sort((x,y)=>y.total-x.total);
-    const sum={};
-    for(const lv of levels) sum[lv]=batchRows.reduce((s,r)=>s+r[lv],0);
-    document.getElementById("batch-stats").innerHTML=`<div class="stats"><div class="stat"><b>${total}</b><span>open tasks</span></div><div class="stat"><b>${batchRows.length}</b><span>model pairs</span></div><div class="stat"><b>${sum.L8}</b><span>open L8</span></div><div class="stat"><b>${sum.L10}</b><span>open L10</span></div><div class="stat"><b>${sum.L12}</b><span>open L12</span></div><div class="stat"><b>${sum["L-1"]}</b><span>open L-1</span></div></div>`;
-    const headers=["model_a_name","model_b_name",...levels,"total"];
-    renderRows(document.getElementById("batch-table"), headers, batchRows.map(r=>{
-      const o={}; for(const h of headers) o[h]=r[h]||0; o.model_a_name=r.model_a_name; o.model_b_name=r.model_b_name; return o;
-    }));
-    document.getElementById("batch-dl").disabled=false;
+    batchSource=data.rows;
+    fillFilter("batch-filter-a", batchSource.map(r=>(r.model_a_name||"").trim()||"(null)"));
+    fillFilter("batch-filter-b", batchSource.map(r=>(r.model_b_name||"").trim()||"(null)"));
+    drawBatch();
     const when=data.retrieved_at?new Date(data.retrieved_at).toLocaleString():"";
     status.textContent=fresh?"Updated just now.":(when?("Saved result from "+when+"."):"Saved result loaded.");
   }catch(e){ status.textContent=e.message; }
@@ -886,6 +901,8 @@ async function loadBatch(fresh){
 }
 document.getElementById("batch-go").onclick=()=>loadBatch(false);
 document.getElementById("batch-fresh").onclick=()=>loadBatch(true);
+document.getElementById("batch-filter-a").onchange=drawBatch;
+document.getElementById("batch-filter-b").onchange=drawBatch;
 document.getElementById("batch-sql").onclick=async()=>{
   const status=document.getElementById("batch-status");
   try{
@@ -899,22 +916,32 @@ document.getElementById("batch-dl").onclick=()=>{
 };
 
 /* ---------- deliveries (Redash 390037, pivot 672678) ---------- */
-let delRows=[], delPivot=[];
-const DEL_PIVOT=[
-  ["MODEL_A_NAME","Model A"],
-  ["MODEL_B_NAME","Model B"],
-  ["DELIVERED_LAST_21D","Delivered, last 21 days"],
-  ["PENDING_TO_DELIVER","Pending review (L8, L10, L12)"],
-  ["DELIVERED_PLUS_PENDING","Delivered + pending review"],
-  ["PENDING_IN_ATTEMPT","Still in attempt"],
-  ["MODEL_A_TOTAL_MINS_PER_TASK","Model A minutes per task"],
-  ["PAIR_TOTAL_MINS_PER_TASK","Pair minutes per task"],
-  ["TOTAL","Total tasks"]
-];
+let delRows=[], delPivot=[], delLoadedDays=0;
+function lookbackDays(){ return Number(document.getElementById("del-lookback").value)||60; }
+function deliveryPivot(){
+  const days=delLoadedDays||lookbackDays();
+  const label=days===60?"Delivered, last 60 days":"Delivered, last "+days+" days";
+  return [
+    ["MODEL_A_NAME","Model A"],
+    ["MODEL_B_NAME","Model B"],
+    ["DELIVERED_LAST_21D",label],
+    ["PENDING_TO_DELIVER","Pending review (L8, L10, L12)"],
+    ["DELIVERED_PLUS_PENDING","Delivered + pending review"],
+    ["PENDING_IN_ATTEMPT","Still in attempt"],
+    ["MODEL_A_TOTAL_MINS_PER_TASK","Model A minutes per task"],
+    ["PAIR_TOTAL_MINS_PER_TASK","Pair minutes per task"],
+    ["TOTAL","Total tasks"]
+  ];
+}
 function num(v){ const n=Number(v); return Number.isFinite(n)?n:0; }
 function drawDeliveries(){
+  const DEL_PIVOT=deliveryPivot();
+  const wantA=document.getElementById("del-filter-a").value;
+  const wantB=document.getElementById("del-filter-b").value;
   const groups=new Map();
   for(const r of delRows){
+    if(wantA && (r.MODEL_A_NAME||"")!==wantA) continue;
+    if(wantB && (r.MODEL_B_NAME||"")!==wantB) continue;
     const key=DEL_PIVOT.slice(0,-1).map(([k])=>r[k]||"").join("\u0001");
     if(!groups.has(key)){
       const row={};
@@ -940,15 +967,19 @@ function drawDeliveries(){
 }
 async function loadDeliveries(fresh){
   const status=document.getElementById("del-status");
-  status.textContent=fresh?"Recomputing in Redash. This takes about 10 minutes.":"Loading the saved result…";
+  const days=lookbackDays();
+  status.textContent=fresh?"Recomputing "+days+" days in Redash. This takes about 10 minutes.":"Loading the saved "+days+"-day result…";
   document.getElementById("del-go").disabled=true;
   document.getElementById("del-cached").disabled=true;
   try{
-    const data=await runQuery(390037, {max_age: fresh?0:60*60*24*30});
+    const data=await runQuery(390037, {max_age: fresh?0:60*60*24*30, params:{project_id:PROJECT_ID, lookback_days:days}});
     delRows=data.rows;
+    delLoadedDays=days;
+    fillFilter("del-filter-a", delRows.map(r=>r.MODEL_A_NAME||""));
+    fillFilter("del-filter-b", delRows.map(r=>r.MODEL_B_NAME||""));
     drawDeliveries();
     const when=data.retrieved_at?new Date(data.retrieved_at).toLocaleString():"";
-    status.textContent=fresh?"Updated just now.":(when?("Saved result from "+when+"."):"Saved result loaded.");
+    status.textContent=(fresh?"Updated just now. ":(when?("Saved result from "+when+". "):"Saved result loaded. "))+"Window is "+days+" days.";
   }catch(e){ status.textContent=e.message; }
   finally{
     document.getElementById("del-go").disabled=false;
@@ -957,16 +988,28 @@ async function loadDeliveries(fresh){
 }
 document.getElementById("del-go").onclick=()=>loadDeliveries(true);
 document.getElementById("del-cached").onclick=()=>loadDeliveries(false);
+document.getElementById("del-filter-a").onchange=drawDeliveries;
+document.getElementById("del-filter-b").onchange=drawDeliveries;
+document.getElementById("del-lookback").onchange=()=>{
+  const days=lookbackDays();
+  const status=document.getElementById("del-status");
+  if(delLoadedDays && delLoadedDays!==days) status.textContent="The table is still the "+delLoadedDays+"-day window. Load saved result or Recompute to apply "+days+" days.";
+};
 document.getElementById("del-sql").onclick=async()=>{
   const status=document.getElementById("del-status");
   try{
-    downloadText("honeybee_ultra_deliveries.sql", await fetchSql("ultra_deliveries.sql"), "text/plain;charset=utf-8");
-    status.textContent="Saved the query. Run it on Redash data source 22.";
+    let sql=await fetchSql("ultra_deliveries.sql");
+    const days=String(lookbackDays());
+    if(!sql.includes("{{lookback_days}}")) throw new Error("This query file has no lookback placeholder.");
+    sql=sql.replaceAll("{{lookback_days}}", days);
+    downloadText("honeybee_ultra_deliveries.sql", sql, "text/plain;charset=utf-8");
+    status.textContent="Saved the query with a "+days+"-day window. Run it on Redash data source 22.";
   }catch(e){ status.textContent=e.message; }
 };
 document.getElementById("del-pivot-dl").onclick=()=>{
-  const headers=DEL_PIVOT.map(([,label])=>label);
-  const rows=delPivot.map(r=>{const o={}; for(const [k,label] of DEL_PIVOT) o[label]=k==="TOTAL"?r.TOTAL:r[k]; return o;});
+  const pivot=deliveryPivot();
+  const headers=pivot.map(([,label])=>label);
+  const rows=delPivot.map(r=>{const o={}; for(const [k,label] of pivot) o[label]=k==="TOTAL"?r.TOTAL:r[k]; return o;});
   download("ultra_deliveries_pivot.csv", toCSV(headers, rows));
 };
 

@@ -1,6 +1,7 @@
 -- Ultra deliveries, query 390037. Run this on Redash data source 22.
 -- Project 6a567b80aaa4d140131eae6c.
--- Delivered means sent in the last 21 days (Pacific), or completed in that window and never sent.
+-- Delivered means sent in the last {{lookback_days}} days (Pacific), or completed in that window and never sent.
+-- The viewer replaces {{lookback_days}} before running. Default is 60.
 -- Pending review is a task at L8, L10, or L12. Still in attempt has not left the attempt layer.
 
 with pt as (
@@ -19,7 +20,7 @@ sent_batches as (
 delivered as (
   select distinct s.task_id
   from sent_batches s, pt
-  where convert_timezone('America/Los_Angeles', s.delivered_at) >= dateadd(day, -21, pt.now_pt)
+  where convert_timezone('America/Los_Angeles', s.delivered_at) >= dateadd(day, -{{lookback_days}}, pt.now_pt)
 ),
 -- Completed in the last 21 days (PT) but never in any sent batch, counted as delivered
 completed_undelivered as (
@@ -28,7 +29,7 @@ completed_undelivered as (
   where t.project = '6a567b80aaa4d140131eae6c'
     and not coalesce(t.__deleted, false)
     and t.status = 'completed'
-    and convert_timezone('America/Los_Angeles', t.completed_at) >= dateadd(day, -21, pt.now_pt)
+    and convert_timezone('America/Los_Angeles', t.completed_at) >= dateadd(day, -{{lookback_days}}, pt.now_pt)
     and not exists (select 1 from sent_batches s where s.task_id = t._id)
 ),
 latest_node as (

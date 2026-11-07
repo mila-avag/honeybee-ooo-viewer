@@ -47,7 +47,18 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .tw{overflow:auto;max-height:560px;border:1px solid var(--line);border-radius:10px}
 table{border-collapse:collapse;width:100%;font-size:12.5px}
 th{position:sticky;top:0;background:var(--accent);color:#fff;text-align:left;padding:6px 8px;white-space:nowrap}
+th.sort{cursor:pointer;user-select:none}
+td.num,th.num{text-align:center;font-variant-numeric:tabular-nums}
 td{border-top:1px solid var(--line);padding:5px 8px;vertical-align:top;max-width:340px;overflow-wrap:anywhere}
+.pivot-bar{display:contents}
+.multi{position:relative}
+.multi .panel{position:absolute;top:calc(100% + 4px);left:0;z-index:6;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px;width:280px;max-height:340px;display:flex;flex-direction:column;gap:6px;box-shadow:0 10px 28px rgba(15,23,42,.14)}
+.multi .panel[hidden]{display:none}
+.multi .opts{overflow:auto;max-height:230px}
+.multi .opts label{display:flex;gap:6px;align-items:flex-start;padding:3px 0;color:var(--ink);font-size:13px}
+.multi .search{width:100%}
+.menu-actions{display:flex;gap:6px}
+.menu-actions button{border:0;background:var(--tint);color:var(--accent);border-radius:6px;padding:3px 8px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
 tr:nth-child(even) td{background:rgba(127,127,160,.05)}
 .pill{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11.5px;font-weight:700}
 .pill.ok{background:var(--ok-bg);color:var(--ok)}
@@ -145,14 +156,14 @@ python3 honeybee_viewer_server.py</pre>
       <h3>Batch progress</h3>
       <p><b>When.</b> You want the current count of open tasks by model pair and review layer.</p>
       <p><b>Need.</b> The Redash server. Load saved result returns the last run. Recompute scans the project and takes about 10 minutes. Download query saves the SQL for data source 22.</p>
-      <p>The layer is the latest human node by <code>created_at</code>, the same read as Ultra deliveries. If that node is pending, the task is counted at its level, including L-1 tasks that nobody has attempted yet. Model A and Model B are the task metadata names, with the same renames as the deliveries query. Filters only hide rows in the table already loaded.</p>
+      <p>The layer is the latest human node by <code>created_at</code>, the same read as Ultra deliveries. If that node is pending, the task is counted at its level, including L-1 tasks that nobody has attempted yet. Model A and Model B are the task metadata names, with the same renames as the deliveries query. Model A and Model B are multi-select filters on the loaded table. Columns can be hidden. A column header sorts the table. A layer with no tasks is left out.</p>
     </div>
 
     <div class="card">
       <h3>Ultra deliveries</h3>
       <p><b>When.</b> You want the delivery pivot: what went out recently, what is still in review, and what is still in attempt, by model pair.</p>
       <p><b>Need.</b> The Redash server. Load saved result returns the last run. Recompute takes about 10 minutes. Download query saves the SQL for data source 22.</p>
-      <p>The window defaults to 60 days. The Lookback menu is in weeks, plus the 60-day choice. Changing it does not rerun Snowflake until you load or recompute. The first run for a window takes about 10 minutes. Later loads of that same window use the saved result. Filters only hide rows in the table already loaded. The window is Pacific time.</p>
+      <p>The window defaults to 60 days. The Lookback menu is in weeks, plus the 60-day choice. Changing it does not rerun Snowflake until you load or recompute. The first run for a window takes about 10 minutes. Later loads of that same window use the saved result. Model A and Model B are multi-select filters on the loaded table. Columns can be hidden. A column header sorts the table. The window is Pacific time.</p>
       <ul class="explain">
         <li><b>Delivered.</b> Sent in a delivery batch inside the selected window, or completed in that window and never present in any sent batch.</li>
         <li><b>Pending review (L8, L10, L12).</b> The latest human node by created_at is pending at one of those three levels.</li>
@@ -260,11 +271,10 @@ python3 honeybee_viewer_server.py</pre>
 
   <section id="batch">
     <h2>Batch progress</h2>
-    <p class="lede">One row per model pair. The layer is the latest human node by created_at, the same read as Ultra deliveries. A pending node is counted at that level, including tasks with no attempt yet. Names come from task metadata. Load saved result reads the last finished run of this logic. Recompute scans again and takes a few minutes. Filters hide pairs in the table. They do not rerun Snowflake.</p>
+    <p class="lede">One row per model pair. The layer is the latest human node by created_at, the same read as Ultra deliveries. A pending node is counted at that level, including tasks with no attempt yet. Names come from task metadata. Load saved result reads the last finished run of this logic. Recompute scans again and takes a few minutes. Model A and Model B accept several values at once. Columns hides any column. A column header sorts. None of that reruns Snowflake.</p>
     <div class="card">
       <div class="row">
-        <label class="inl">Model A <select id="batch-filter-a"><option value="">All</option></select></label>
-        <label class="inl">Model B <select id="batch-filter-b"><option value="">All</option></select></label>
+        <div class="pivot-bar" id="batch-tools"></div>
         <button class="b p" id="batch-go">Load saved result</button>
         <button class="b" id="batch-fresh">Recompute (about 10 min)</button>
         <button class="b" id="batch-dl" disabled>Download CSV</button>
@@ -278,7 +288,7 @@ python3 honeybee_viewer_server.py</pre>
 
   <section id="deliveries">
     <h2>Ultra deliveries</h2>
-    <p class="lede">Same query as 390037 on data source 22, with the lookback you pick. It starts at 60 days. Load saved result returns the last run for that window. The first run of a window takes about 10 minutes. Filters hide pairs in the table already loaded. Changing Lookback applies on the next load.</p>
+    <p class="lede">Same query as 390037 on data source 22, with the lookback you pick. It starts at 60 days. Load saved result returns the last run for that window. The first run of a window takes about 10 minutes. Model A and Model B accept several values at once. Columns hides any column. A column header sorts. Changing Lookback applies on the next load.</p>
     <div class="note">
       <ul class="explain">
         <li><b>Delivered.</b> Sent in a delivery batch inside the selected window, or completed in that window and never present in any sent batch.</li>
@@ -302,8 +312,7 @@ python3 honeybee_viewer_server.py</pre>
             <option value="168">24 weeks</option>
           </select>
         </label>
-        <label class="inl">Model A <select id="del-filter-a"><option value="">All</option></select></label>
-        <label class="inl">Model B <select id="del-filter-b"><option value="">All</option></select></label>
+        <div class="pivot-bar" id="del-tools"></div>
         <button class="b p" id="del-cached">Load saved result</button>
         <button class="b" id="del-go">Recompute (about 10 min)</button>
         <button class="b" id="del-pivot-dl" disabled>Download CSV</button>
@@ -840,27 +849,142 @@ document.getElementById("upload-sql").onclick=async()=>{
   }catch(e){ status.textContent=e.message; }
 };
 
-/* ---------- batch progress ---------- */
-let batchSource=[], batchRows=[], batchHeaders=["model_a_name","model_b_name","total"];
-const BATCH_LEVELS=["L-1","L0","L1","L4","L8","L10","L11","L12","Not open","other"];
-function fillFilter(id, values){
-  const sel=document.getElementById(id);
-  const keep=sel.value;
-  const uniq=[...new Set(values.filter(v=>v!==""))].sort((a,b)=>String(a).localeCompare(String(b)));
-  sel.innerHTML=`<option value="">All</option>`+uniq.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
-  if(uniq.includes(keep)) sel.value=keep;
+/* ---------- pivot controls ---------- */
+function uniqSorted(values){
+  return [...new Set(values.filter(v=>v!==""))].sort((a,b)=>String(a).localeCompare(String(b)));
 }
+function chosen(state, field){ return state.selected[field]||null; }
+function allows(state, field, value){
+  const set=chosen(state, field);
+  return !set || set.has(value);
+}
+function toggleValue(state, field, values, value, on){
+  const cur=chosen(state, field);
+  const set=new Set(cur||values);
+  if(on) set.add(value); else set.delete(value);
+  state.selected[field]=set.size===values.length?null:set;
+}
+function filterButton(name, values, set){
+  if(!set || set.size===values.length) return name+": All";
+  if(set.size===0) return name+": None";
+  if(set.size===1){ const one=[...set][0]; return name+": "+(one.length>28?one.slice(0,28)+"…":one); }
+  return name+": "+set.size+" selected";
+}
+function applyMenuSearch(box){
+  const q=(box.querySelector(".search").value||"").trim().toLowerCase();
+  for(const lab of box.querySelectorAll(".opts label")) lab.hidden=q && !lab.dataset.v.includes(q);
+}
+function syncMenu(parent, id, buttonText, items, handlers){
+  const sig=items.map(i=>i.value).join("\n");
+  let box=parent.querySelector("[data-menu='"+id+"']");
+  if(!box || box.dataset.sig!==sig){
+    const open=!!(box && box.classList.contains("open"));
+    const q=box&&box.querySelector(".search")?box.querySelector(".search").value:"";
+    if(box) box.remove();
+    box=document.createElement("div");
+    box.className="multi"+(open?" open":"");
+    box.dataset.menu=id;
+    box.dataset.sig=sig;
+    box.innerHTML=`<button type="button" class="b menu-btn"></button><div class="panel" ${open?"":"hidden"}>
+      <div class="menu-actions"><button type="button" data-act="all">All</button><button type="button" data-act="none">None</button></div>
+      <input class="search" type="text" placeholder="Search">
+      <div class="opts"></div>
+    </div>`;
+    const optsEl=box.querySelector(".opts");
+    for(const item of items){
+      const lab=document.createElement("label");
+      lab.dataset.v=String(item.value).toLowerCase();
+      const input=document.createElement("input");
+      input.type="checkbox";
+      input.checked=item.checked;
+      input.dataset.value=item.value;
+      const span=document.createElement("span");
+      span.textContent=item.label;
+      lab.append(input, span);
+      optsEl.appendChild(lab);
+    }
+    box.querySelector(".search").value=q;
+    applyMenuSearch(box);
+    box.querySelector(".menu-btn").onclick=(e)=>{
+      e.stopPropagation();
+      const willOpen=!box.classList.contains("open");
+      parent.querySelectorAll(".multi.open").forEach(m=>{
+        if(m!==box){ m.classList.remove("open"); m.querySelector(".panel").hidden=true; }
+      });
+      box.classList.toggle("open", willOpen);
+      box.querySelector(".panel").hidden=!willOpen;
+      if(willOpen) box.querySelector(".search").focus();
+    };
+    box.querySelector(".panel").onclick=(e)=>e.stopPropagation();
+    box.querySelector("[data-act=all]").onclick=()=>handlers.onAll();
+    box.querySelector("[data-act=none]").onclick=()=>handlers.onNone();
+    optsEl.addEventListener("change",(e)=>{
+      if(e.target && e.target.type==="checkbox") handlers.onToggle(e.target.dataset.value, e.target.checked);
+    });
+    box.querySelector(".search").oninput=()=>applyMenuSearch(box);
+    parent.appendChild(box);
+  }
+  box.querySelector(".menu-btn").textContent=buttonText;
+  const byValue=new Map(items.map(i=>[i.value, i.checked]));
+  for(const input of box.querySelectorAll(".opts input")){
+    if(byValue.has(input.dataset.value)) input.checked=byValue.get(input.dataset.value);
+  }
+}
+function visibleOf(headers, hidden){ return headers.filter(h=>!hidden.has(h)); }
+function renderPivot(host, headers, rows, opts){
+  const numeric=new Set(opts.numeric||[]);
+  const key=opts.sortKey;
+  const dir=opts.sortDir||1;
+  const data=rows.filter(r=>!r._total);
+  const foot=rows.filter(r=>r._total);
+  const sorted=data.slice();
+  if(key && sorted.some(r=>Object.prototype.hasOwnProperty.call(r, key))){
+    sorted.sort((a,b)=>{
+      const an=Number(a[key]), bn=Number(b[key]);
+      const c=(Number.isFinite(an)&&Number.isFinite(bn))?an-bn:String(a[key]??"").localeCompare(String(b[key]??""), undefined, {numeric:true});
+      return (c||0)*dir;
+    });
+  }
+  if(!headers.length){
+    host.innerHTML=`<p class="lede">Every column is hidden. Open Columns and choose one.</p>`;
+    return sorted;
+  }
+  const lim=500, shown=sorted.slice(0,lim);
+  const arrow=dir<0?" ▼":" ▲";
+  const paint=(r)=>"<tr>"+headers.map(x=>{
+    const v=r[x]==null?"":String(r[x]);
+    return `<td class="${numeric.has(x)?"num":""}">${esc(v.length>180?v.slice(0,180)+"…":v)}</td>`;
+  }).join("")+"</tr>";
+  let h=`<div class="tw"><table><thead><tr>${headers.map(x=>{
+    const cls=["sort"]; if(numeric.has(x)) cls.push("num");
+    return `<th class="${cls.join(" ")}" data-k="${esc(x)}">${esc(x)}${key===x?arrow:""}</th>`;
+  }).join("")}</tr></thead><tbody>`;
+  for(const r of shown) h+=paint(r);
+  for(const r of foot) h+=paint(r);
+  h+="</tbody></table></div>";
+  if(data.length>lim) h+=`<p class="lede">Showing ${lim} of ${data.length}. Download has every row.</p>`;
+  host.innerHTML=h;
+  host.querySelectorAll("th.sort").forEach(th=>{ th.onclick=()=>opts.onSort(th.dataset.k); });
+  return sorted;
+}
+document.addEventListener("click",()=>{
+  document.querySelectorAll(".multi.open").forEach(m=>{
+    m.classList.remove("open");
+    const panel=m.querySelector(".panel");
+    if(panel) panel.hidden=true;
+  });
+});
+
+/* ---------- batch progress ---------- */
+let batchSource=[], batchRows=[], batchVisible=["model_a_name","model_b_name","total"];
+const batchView={selected:{}, hidden:new Set(), sortKey:"total", sortDir:-1};
+const BATCH_LEVELS=["L-1","L0","L1","L4","L8","L10","L11","L12","Not open","other"];
 function drawBatch(){
-  const wantA=document.getElementById("batch-filter-a").value;
-  const wantB=document.getElementById("batch-filter-b").value;
   const pairs=new Map();
-  let total=0;
   for(const r of batchSource){
     if((r.review_level_label||"")==="Completed" || (r.review_level_label||"")==="Paused") continue;
     const a=(r.model_a_name||"").trim()||"(null)";
     const b=(r.model_b_name||"").trim()||"(null)";
-    if(wantA && a!==wantA) continue;
-    if(wantB && b!==wantB) continue;
     const key=a+"  vs  "+b;
     const n=Number(r.task_count)||0;
     const lvl=Number(r.review_level);
@@ -868,18 +992,53 @@ function drawBatch(){
     const label=known[r.review_level_label] ? r.review_level_label : ([-1,0,1,4,8,10,11,12].includes(lvl) ? "L"+lvl : "other");
     if(!pairs.has(key)) pairs.set(key, {model_a_name:a, model_b_name:b, "L-1":0,L0:0,L1:0,L4:0,L8:0,L10:0,L11:0,L12:0,"Not open":0,other:0,total:0});
     const row=pairs.get(key);
-    row[label]+=n; row.total+=n; total+=n;
+    row[label]+=n; row.total+=n;
   }
-  batchRows=[...pairs.values()].filter(r=>r.total>0).sort((x,y)=>y.total-x.total);
+  const allRows=[...pairs.values()].filter(r=>r.total>0);
+  const namesA=uniqSorted(allRows.map(r=>r.model_a_name));
+  const namesB=uniqSorted(allRows.map(r=>r.model_b_name));
+  batchRows=allRows.filter(r=>allows(batchView,"model_a_name",r.model_a_name)&&allows(batchView,"model_b_name",r.model_b_name));
   const shown=BATCH_LEVELS.filter(lv=>batchRows.some(r=>(r[lv]||0)>0));
+  const allHeaders=["model_a_name","model_b_name",...shown,"total"];
+  for(const h of [...batchView.hidden]) if(!allHeaders.includes(h)) batchView.hidden.delete(h);
+  batchVisible=visibleOf(allHeaders, batchView.hidden);
   const sum={};
+  let total=0;
+  for(const r of batchRows) total+=r.total;
   for(const lv of shown) sum[lv]=batchRows.reduce((s,r)=>s+(r[lv]||0),0);
-  const levelStats=shown.map(lv=>`<div class="stat"><b>${sum[lv]}</b><span>open ${esc(lv)}</span></div>`).join("");
+  const levelStats=shown.filter(lv=>!batchView.hidden.has(lv)).map(lv=>`<div class="stat"><b>${sum[lv]}</b><span>open ${esc(lv)}</span></div>`).join("");
   document.getElementById("batch-stats").innerHTML=`<div class="stats"><div class="stat"><b>${total}</b><span>open tasks</span></div><div class="stat"><b>${batchRows.length}</b><span>model pairs</span></div>${levelStats}</div>`;
-  batchHeaders=["model_a_name","model_b_name",...shown,"total"];
-  renderRows(document.getElementById("batch-table"), batchHeaders, batchRows.map(r=>{
-    const o={}; for(const h of batchHeaders) o[h]=r[h]||0; o.model_a_name=r.model_a_name; o.model_b_name=r.model_b_name; return o;
-  }));
+  const totalRow={_total:true, model_a_name:"", model_b_name:""};
+  for(const lv of shown) totalRow[lv]=sum[lv]||0;
+  totalRow.total=total;
+  const batchLabel=["model_a_name","model_b_name"].find(h=>batchVisible.includes(h));
+  if(batchLabel) totalRow[batchLabel]="Total";
+  const tools=document.getElementById("batch-tools");
+  syncMenu(tools, "a", filterButton("Model A", namesA, chosen(batchView,"model_a_name")), namesA.map(v=>({value:v, label:v, checked:!chosen(batchView,"model_a_name")||chosen(batchView,"model_a_name").has(v)})), {
+    onToggle:(value,on)=>{ toggleValue(batchView,"model_a_name",namesA,value,on); drawBatch(); },
+    onAll:()=>{ batchView.selected.model_a_name=null; drawBatch(); },
+    onNone:()=>{ batchView.selected.model_a_name=new Set(); drawBatch(); }
+  });
+  syncMenu(tools, "b", filterButton("Model B", namesB, chosen(batchView,"model_b_name")), namesB.map(v=>({value:v, label:v, checked:!chosen(batchView,"model_b_name")||chosen(batchView,"model_b_name").has(v)})), {
+    onToggle:(value,on)=>{ toggleValue(batchView,"model_b_name",namesB,value,on); drawBatch(); },
+    onAll:()=>{ batchView.selected.model_b_name=null; drawBatch(); },
+    onNone:()=>{ batchView.selected.model_b_name=new Set(); drawBatch(); }
+  });
+  const hiddenCount=allHeaders.filter(h=>batchView.hidden.has(h)).length;
+  syncMenu(tools, "cols", hiddenCount?("Columns: "+hiddenCount+" hidden"):"Columns: All", allHeaders.map(v=>({value:v, label:v, checked:!batchView.hidden.has(v)})), {
+    onToggle:(value,on)=>{ if(on) batchView.hidden.delete(value); else batchView.hidden.add(value); drawBatch(); },
+    onAll:()=>{ batchView.hidden.clear(); drawBatch(); },
+    onNone:()=>{ batchView.hidden=new Set(allHeaders); drawBatch(); }
+  });
+  batchRows=renderPivot(document.getElementById("batch-table"), batchVisible, batchRows.concat([totalRow]), {
+    numeric:batchVisible.filter(h=>h!=="model_a_name"&&h!=="model_b_name"),
+    sortKey:batchView.sortKey, sortDir:batchView.sortDir,
+    onSort:(key)=>{
+      if(batchView.sortKey===key) batchView.sortDir*=-1;
+      else { batchView.sortKey=key; batchView.sortDir=(key==="model_a_name"||key==="model_b_name")?1:-1; }
+      drawBatch();
+    }
+  });
   document.getElementById("batch-dl").disabled=batchRows.length===0;
 }
 async function loadBatch(fresh){
@@ -890,8 +1049,6 @@ async function loadBatch(fresh){
   try{
     const data=await runQuery(400628, {max_age: fresh?0:60*60*24*30});
     batchSource=data.rows;
-    fillFilter("batch-filter-a", batchSource.map(r=>(r.model_a_name||"").trim()||"(null)"));
-    fillFilter("batch-filter-b", batchSource.map(r=>(r.model_b_name||"").trim()||"(null)"));
     drawBatch();
     const when=data.retrieved_at?new Date(data.retrieved_at).toLocaleString():"";
     status.textContent=fresh?"Updated just now.":(when?("Saved result from "+when+"."):"Saved result loaded.");
@@ -903,8 +1060,6 @@ async function loadBatch(fresh){
 }
 document.getElementById("batch-go").onclick=()=>loadBatch(false);
 document.getElementById("batch-fresh").onclick=()=>loadBatch(true);
-document.getElementById("batch-filter-a").onchange=drawBatch;
-document.getElementById("batch-filter-b").onchange=drawBatch;
 document.getElementById("batch-sql").onclick=async()=>{
   const status=document.getElementById("batch-status");
   try{
@@ -913,11 +1068,12 @@ document.getElementById("batch-sql").onclick=async()=>{
   }catch(e){ status.textContent=e.message; }
 };
 document.getElementById("batch-dl").onclick=()=>{
-  download("honeybee_batch_progress.csv", toCSV(batchHeaders, batchRows));
+  download("honeybee_batch_progress.csv", toCSV(batchVisible, batchRows));
 };
 
 /* ---------- deliveries (Redash 390037, pivot 672678) ---------- */
-let delRows=[], delPivot=[], delLoadedDays=0;
+let delRows=[], delPivot=[], delVisible=[], delLoadedDays=0;
+const delView={selected:{}, hidden:new Set(), sortKey:null, sortDir:1};
 function lookbackDays(){ return Number(document.getElementById("del-lookback").value)||60; }
 function deliveryPivot(){
   const days=delLoadedDays||lookbackDays();
@@ -937,12 +1093,12 @@ function deliveryPivot(){
 function num(v){ const n=Number(v); return Number.isFinite(n)?n:0; }
 function drawDeliveries(){
   const DEL_PIVOT=deliveryPivot();
-  const wantA=document.getElementById("del-filter-a").value;
-  const wantB=document.getElementById("del-filter-b").value;
+  const namesA=uniqSorted(delRows.map(r=>r.MODEL_A_NAME||""));
+  const namesB=uniqSorted(delRows.map(r=>r.MODEL_B_NAME||""));
   const groups=new Map();
   for(const r of delRows){
-    if(wantA && (r.MODEL_A_NAME||"")!==wantA) continue;
-    if(wantB && (r.MODEL_B_NAME||"")!==wantB) continue;
+    const a=r.MODEL_A_NAME||"", b=r.MODEL_B_NAME||"";
+    if(!allows(delView,"MODEL_A_NAME",a) || !allows(delView,"MODEL_B_NAME",b)) continue;
     const key=DEL_PIVOT.slice(0,-1).map(([k])=>r[k]||"").join("\u0001");
     if(!groups.has(key)){
       const row={};
@@ -952,19 +1108,50 @@ function drawDeliveries(){
     }
     groups.get(key).TOTAL+=num(r.TOTAL);
   }
-  delPivot=[...groups.values()].sort((a,b)=>DEL_PIVOT.slice(0,-1).map(([k])=>String(a[k])).join("\u0001").localeCompare(DEL_PIVOT.slice(0,-1).map(([k])=>String(b[k])).join("\u0001")));
+  delPivot=[...groups.values()];
   const total=delPivot.reduce((s,r)=>s+num(r.TOTAL),0);
   const pivotHeaders=DEL_PIVOT.map(([,label])=>label);
+  for(const h of [...delView.hidden]) if(!pivotHeaders.includes(h)) delView.hidden.delete(h);
+  delVisible=visibleOf(pivotHeaders, delView.hidden);
   const pivotRows=delPivot.map(r=>{
     const o={};
     for(const [k,label] of DEL_PIVOT) o[label]=k==="TOTAL"?r.TOTAL:r[k];
     return o;
   });
-  const totalRow={};
-  pivotHeaders.forEach((h,i)=>{ totalRow[h]=i===0?"Total":(h===pivotHeaders[pivotHeaders.length-1]?total:""); });
-  pivotRows.push(totalRow);
-  renderRows(document.getElementById("del-pivot"), pivotHeaders, pivotRows);
-  document.getElementById("del-pivot-dl").disabled=false;
+  const totalRow={_total:true};
+  for(const h of pivotHeaders) totalRow[h]="";
+  const totalLabel=DEL_PIVOT.find(([k])=>k==="TOTAL")[1];
+  totalRow[totalLabel]=total;
+  const delLabel=["Model A","Model B"].find(h=>delVisible.includes(h));
+  if(delLabel) totalRow[delLabel]="Total";
+  const tools=document.getElementById("del-tools");
+  syncMenu(tools, "a", filterButton("Model A", namesA, chosen(delView,"MODEL_A_NAME")), namesA.map(v=>({value:v, label:v, checked:!chosen(delView,"MODEL_A_NAME")||chosen(delView,"MODEL_A_NAME").has(v)})), {
+    onToggle:(value,on)=>{ toggleValue(delView,"MODEL_A_NAME",namesA,value,on); drawDeliveries(); },
+    onAll:()=>{ delView.selected.MODEL_A_NAME=null; drawDeliveries(); },
+    onNone:()=>{ delView.selected.MODEL_A_NAME=new Set(); drawDeliveries(); }
+  });
+  syncMenu(tools, "b", filterButton("Model B", namesB, chosen(delView,"MODEL_B_NAME")), namesB.map(v=>({value:v, label:v, checked:!chosen(delView,"MODEL_B_NAME")||chosen(delView,"MODEL_B_NAME").has(v)})), {
+    onToggle:(value,on)=>{ toggleValue(delView,"MODEL_B_NAME",namesB,value,on); drawDeliveries(); },
+    onAll:()=>{ delView.selected.MODEL_B_NAME=null; drawDeliveries(); },
+    onNone:()=>{ delView.selected.MODEL_B_NAME=new Set(); drawDeliveries(); }
+  });
+  const hiddenCount=pivotHeaders.filter(h=>delView.hidden.has(h)).length;
+  syncMenu(tools, "cols", hiddenCount?("Columns: "+hiddenCount+" hidden"):"Columns: All", pivotHeaders.map(v=>({value:v, label:v, checked:!delView.hidden.has(v)})), {
+    onToggle:(value,on)=>{ if(on) delView.hidden.delete(value); else delView.hidden.add(value); drawDeliveries(); },
+    onAll:()=>{ delView.hidden.clear(); drawDeliveries(); },
+    onNone:()=>{ delView.hidden=new Set(pivotHeaders); drawDeliveries(); }
+  });
+  const textCols=new Set(["Model A","Model B"]);
+  delPivot=renderPivot(document.getElementById("del-pivot"), delVisible, pivotRows.concat([totalRow]), {
+    numeric:delVisible.filter(h=>!textCols.has(h)),
+    sortKey:delView.sortKey, sortDir:delView.sortDir,
+    onSort:(key)=>{
+      if(delView.sortKey===key) delView.sortDir*=-1;
+      else { delView.sortKey=key; delView.sortDir=textCols.has(key)?1:-1; }
+      drawDeliveries();
+    }
+  });
+  document.getElementById("del-pivot-dl").disabled=delPivot.length===0;
 }
 async function loadDeliveries(fresh){
   const status=document.getElementById("del-status");
@@ -976,8 +1163,6 @@ async function loadDeliveries(fresh){
     const data=await runQuery(390037, {max_age: fresh?0:60*60*24*30, params:{project_id:PROJECT_ID, lookback_days:days}});
     delRows=data.rows;
     delLoadedDays=days;
-    fillFilter("del-filter-a", delRows.map(r=>r.MODEL_A_NAME||""));
-    fillFilter("del-filter-b", delRows.map(r=>r.MODEL_B_NAME||""));
     drawDeliveries();
     const when=data.retrieved_at?new Date(data.retrieved_at).toLocaleString():"";
     status.textContent=(fresh?"Updated just now. ":(when?("Saved result from "+when+". "):"Saved result loaded. "))+"Window is "+days+" days.";
@@ -989,8 +1174,6 @@ async function loadDeliveries(fresh){
 }
 document.getElementById("del-go").onclick=()=>loadDeliveries(true);
 document.getElementById("del-cached").onclick=()=>loadDeliveries(false);
-document.getElementById("del-filter-a").onchange=drawDeliveries;
-document.getElementById("del-filter-b").onchange=drawDeliveries;
 document.getElementById("del-lookback").onchange=()=>{
   const days=lookbackDays();
   const status=document.getElementById("del-status");
@@ -1008,10 +1191,7 @@ document.getElementById("del-sql").onclick=async()=>{
   }catch(e){ status.textContent=e.message; }
 };
 document.getElementById("del-pivot-dl").onclick=()=>{
-  const pivot=deliveryPivot();
-  const headers=pivot.map(([,label])=>label);
-  const rows=delPivot.map(r=>{const o={}; for(const [k,label] of pivot) o[label]=k==="TOTAL"?r.TOTAL:r[k]; return o;});
-  download("ultra_deliveries_pivot.csv", toCSV(headers, rows));
+  download("ultra_deliveries_pivot.csv", toCSV(delVisible, delPivot));
 };
 
 document.getElementById("upload-pair-count").onchange=renderUploadPairs;

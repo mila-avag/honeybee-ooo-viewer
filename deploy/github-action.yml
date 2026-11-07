@@ -1,0 +1,36 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check host token
+        id: host
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -n "$FLY_API_TOKEN" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "Fly is not connected yet, so this push does not deploy."
+          fi
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+        if: steps.host.outputs.ready == 'true'
+      - name: Stage Redash access
+        if: steps.host.outputs.ready == 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          REDASH_API_KEY: ${{ secrets.REDASH_API_KEY }}
+        run: flyctl secrets set REDASH_API_KEY="$REDASH_API_KEY" --stage
+      - name: Deploy
+        if: steps.host.outputs.ready == 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl deploy --remote-only --ha=false

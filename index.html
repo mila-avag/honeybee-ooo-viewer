@@ -138,7 +138,7 @@ python3 honeybee_viewer_server.py</pre>
         <li><code>environment_context</code> and <code>estimated_turns</code> are allowed to be empty. They are never flagged.</li>
       </ul>
       <p>A broken row is still in the CSV. Broken rows are moved to the end, and the page lists the task id, the task type, and the missing fields. Ids that Snowflake did not return are listed separately. They have no row to put in the file. The download is not blocked.</p>
-      <p>The credential dropdown writes the word <code>single</code> or <code>dual</code> into <code>credential_mode</code>. It does not change how many logins are filled. When an accounts file is loaded, every output row gets two logins, and those two are always different accounts. A task with 3 pairs is 3 rows, so it takes 6 logins. Accounts are handed out in file order, two per row, then the list starts over. Passwords are written only into the CSV you download. They are not sent to Redash.</p>
+      <p>The credential dropdown writes the word <code>single</code> or <code>dual</code> into <code>credential_mode</code>. It does not change how many logins are filled. When an accounts file is loaded, every output row gets two different logins. The assignment looks at the whole file, including every model pair. It gives as many rows as possible a login that appears on no other row. A login used on pair 1 is already spent, so pair 2 of the same task does not count it as unused. Spare logins are the ones that get repeated. Passwords are written only into the CSV you download. They are not sent to Redash.</p>
     </div>
 
     <div class="card">
@@ -260,7 +260,7 @@ python3 honeybee_viewer_server.py</pre>
         <li>If task type contains “aspirational”, universe must be non-blank. Any other task type may have an empty universe.</li>
         <li>Environment and estimated turns are allowed to be empty. They are never flagged.</li>
         <li>Broken rows stay in the file and are moved to the end. The list under the buttons names the task id and the missing fields. Ids Snowflake did not return have no row, so they are listed on their own. The download is not blocked.</li>
-        <li>With an accounts file, each output row gets two different accounts, handed out in file order, two per row, then the list starts over. One task with 3 pairs is 3 rows and uses 6 logins. The same account is never both logins on one row. Passwords are written only into the CSV you download. They are not sent to Redash.</li>
+        <li>With an accounts file, each output row gets two different logins. Uniqueness is counted across the whole file, so a login used on one model pair is not treated as unused on another pair. The page gives as many rows as possible one login that appears nowhere else in the file, and repeats the spare logins to fill the other column. Passwords are written only into the CSV you download. They are not sent to Redash.</li>
       </ul>
     </div>
   </section>
@@ -609,22 +609,40 @@ function loginPlan(n){
   const accounts=uploadAccounts;
   if(!accounts.length) return null;
   if(accounts.length<2) throw new Error("Need at least two different accounts so the two logins on a row are never the same.");
-  const uses=new Array(accounts.length).fill(0);
-  const pairs=[];
-  for(let i=0;i<n;i++){
-    const ai=(2*i)%accounts.length;
-    const bi=(2*i+1)%accounts.length;
+  const N=accounts.length, R=n;
+  const uses=new Array(N).fill(0);
+  const chosen=[];
+  function take(ai, bi){
     uses[ai]++; uses[bi]++;
+    chosen.push([ai, bi]);
+  }
+  if(N>=2*R){
+    for(let i=0;i<R;i++) take(2*i, 2*i+1);
+  }else if(N>=R+1){
+    const spare=N-R;
+    for(let i=0;i<R;i++) take(i, R+(i%spare));
+  }else{
+    const sharedA=N-2, sharedB=N-1;
+    for(let i=0;i<R;i++){
+      if(i<N-2) take(i, i%2===0?sharedA:sharedB);
+      else take(sharedA, sharedB);
+    }
+  }
+  let max=0, rowsWithUnique=0;
+  const pairs=[];
+  for(const [ai, bi] of chosen){
+    if(uses[ai]===1 || uses[bi]===1) rowsWithUnique++;
+    if(uses[ai]>max) max=uses[ai];
+    if(uses[bi]>max) max=uses[bi];
     pairs.push([accounts[ai], accounts[bi]]);
   }
-  let max=0, used=0;
-  for(const u of uses){ if(u>max) max=u; if(u) used++; }
-  return {pairs, max, used};
+  return {pairs, max, rowsWithUnique};
 }
 function loginNote(n){
   if(!uploadAccounts.length) return "Demo logins left blank.";
   const plan=loginPlan(n);
-  return "Each account is used at most "+(plan.max===1?"once":plan.max+" times")+".";
+  if(plan.rowsWithUnique===n) return "Every row has a login used nowhere else in this file.";
+  return plan.rowsWithUnique+" of "+n+" rows have a login used nowhere else in this file.";
 }
 function readPairs(){
   return [...document.querySelectorAll("#upload-pairs .pair")].map(row=>({

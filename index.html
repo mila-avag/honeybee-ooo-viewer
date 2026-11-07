@@ -841,7 +841,7 @@ document.getElementById("upload-sql").onclick=async()=>{
 };
 
 /* ---------- batch progress ---------- */
-let batchSource=[], batchRows=[];
+let batchSource=[], batchRows=[], batchHeaders=["model_a_name","model_b_name","total"];
 const BATCH_LEVELS=["L-1","L0","L1","L4","L8","L10","L11","L12","Not open","other"];
 function fillFilter(id, values){
   const sel=document.getElementById(id);
@@ -871,12 +871,14 @@ function drawBatch(){
     row[label]+=n; row.total+=n; total+=n;
   }
   batchRows=[...pairs.values()].filter(r=>r.total>0).sort((x,y)=>y.total-x.total);
+  const shown=BATCH_LEVELS.filter(lv=>batchRows.some(r=>(r[lv]||0)>0));
   const sum={};
-  for(const lv of BATCH_LEVELS) sum[lv]=batchRows.reduce((s,r)=>s+r[lv],0);
-  document.getElementById("batch-stats").innerHTML=`<div class="stats"><div class="stat"><b>${total}</b><span>open tasks</span></div><div class="stat"><b>${batchRows.length}</b><span>model pairs</span></div><div class="stat"><b>${sum.L8}</b><span>open L8</span></div><div class="stat"><b>${sum.L10}</b><span>open L10</span></div><div class="stat"><b>${sum.L12}</b><span>open L12</span></div><div class="stat"><b>${sum["L-1"]}</b><span>open L-1</span></div></div>`;
-  const headers=["model_a_name","model_b_name",...BATCH_LEVELS,"total"];
-  renderRows(document.getElementById("batch-table"), headers, batchRows.map(r=>{
-    const o={}; for(const h of headers) o[h]=r[h]||0; o.model_a_name=r.model_a_name; o.model_b_name=r.model_b_name; return o;
+  for(const lv of shown) sum[lv]=batchRows.reduce((s,r)=>s+(r[lv]||0),0);
+  const levelStats=shown.map(lv=>`<div class="stat"><b>${sum[lv]}</b><span>open ${esc(lv)}</span></div>`).join("");
+  document.getElementById("batch-stats").innerHTML=`<div class="stats"><div class="stat"><b>${total}</b><span>open tasks</span></div><div class="stat"><b>${batchRows.length}</b><span>model pairs</span></div>${levelStats}</div>`;
+  batchHeaders=["model_a_name","model_b_name",...shown,"total"];
+  renderRows(document.getElementById("batch-table"), batchHeaders, batchRows.map(r=>{
+    const o={}; for(const h of batchHeaders) o[h]=r[h]||0; o.model_a_name=r.model_a_name; o.model_b_name=r.model_b_name; return o;
   }));
   document.getElementById("batch-dl").disabled=batchRows.length===0;
 }
@@ -911,8 +913,7 @@ document.getElementById("batch-sql").onclick=async()=>{
   }catch(e){ status.textContent=e.message; }
 };
 document.getElementById("batch-dl").onclick=()=>{
-  const headers=["model_a_name","model_b_name","L-1","L0","L1","L4","L8","L10","L11","L12","Not open","other","total"];
-  download("honeybee_batch_progress.csv", toCSV(headers, batchRows));
+  download("honeybee_batch_progress.csv", toCSV(batchHeaders, batchRows));
 };
 
 /* ---------- deliveries (Redash 390037, pivot 672678) ---------- */

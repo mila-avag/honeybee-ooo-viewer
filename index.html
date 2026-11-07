@@ -127,8 +127,8 @@ python3 honeybee_viewer_server.py</pre>
     <div class="card">
       <h3>Task upload</h3>
       <p><b>When.</b> You have a list of task ids and need the upload CSV for them.</p>
-      <p><b>Need.</b> Model A and Model B names, a credential mode (single or dual), and the task ids. The Redash server, unless you use Download query and run the SQL on data source 30. For logins, export <a href="https://docs.google.com/spreadsheets/d/1_TILTW4KthPz1-fysSRlEeV04lYA0m8qznVyz9vCVig/edit?gid=1552775865#gid=1552775865" target="_blank" rel="noopener">the test accounts sheet</a> as a CSV with Accounts and Password columns. If you need more demo accounts, reach out to @kevin chen.</p>
-      <p><b>You get.</b> <code>honeybee_task_upload.csv</code>. Language is en_US on every row. Up to 5,000 ids. Demo logins are filled from the accounts file: the two logins on a row are different accounts, and emails are repeated as little as possible. Accounts stay in the browser and are written only into the CSV you download.</p>
+      <p><b>Need.</b> A Model pairs count, a Model A and Model B name for each pair, a credential mode (single or dual), and the task ids. The Redash server, unless you use Download query and run the SQL on data source 30. For logins, export <a href="https://docs.google.com/spreadsheets/d/1_TILTW4KthPz1-fysSRlEeV04lYA0m8qznVyz9vCVig/edit?gid=1552775865#gid=1552775865" target="_blank" rel="noopener">the test accounts sheet</a> as a CSV with Accounts and Password columns. If you need more demo accounts, reach out to @kevin chen.</p>
+      <p><b>You get.</b> <code>honeybee_task_upload.csv</code>. The columns stay <code>model_a_name</code> and <code>model_b_name</code>. Choosing 3 pairs writes 3 rows for every task: row 1 is Model A 1 vs Model B 1, row 2 is Model A 2 vs Model B 2, and so on. Language is en_US on every row. Up to 5,000 ids. Demo logins are filled from the accounts file: the two logins on a row are different accounts, and emails are repeated as little as possible. Accounts stay in the browser and are written only into the CSV you download.</p>
       <p>After the rows come back, the page checks each one. A list counts as empty when the cell is blank, <code>null</code>, <code>[]</code>, <code>{}</code>, or a JSON list whose items have no title and no id. A list with one real criterion counts as present.</p>
       <ul class="explain">
         <li>Every task needs a non-blank <code>opening_prompt</code>.</li>
@@ -138,7 +138,7 @@ python3 honeybee_viewer_server.py</pre>
         <li><code>environment_context</code> and <code>estimated_turns</code> are allowed to be empty. They are never flagged.</li>
       </ul>
       <p>A broken row is still in the CSV. Broken rows are moved to the end, and the page lists the task id, the task type, and the missing fields. Ids that Snowflake did not return are listed separately. They have no row to put in the file. The download is not blocked.</p>
-      <p>The credential dropdown writes the word <code>single</code> or <code>dual</code> into <code>credential_mode</code>. It does not change how many logins are filled. When an accounts file is loaded, every row gets two logins, and those two are always different accounts. Accounts are handed out in file order, two per task, then the list starts over. With 2,002 accounts, each account is used once until 1,001 tasks, and after that the busiest account is used only one more time than the quietest. Passwords are written only into the CSV you download. They are not sent to Redash.</p>
+      <p>The credential dropdown writes the word <code>single</code> or <code>dual</code> into <code>credential_mode</code>. It does not change how many logins are filled. When an accounts file is loaded, every output row gets two logins, and those two are always different accounts. A task with 3 pairs is 3 rows, so it takes 6 logins. Accounts are handed out in file order, two per row, then the list starts over. Passwords are written only into the CSV you download. They are not sent to Redash.</p>
     </div>
 
     <div class="card">
@@ -218,11 +218,23 @@ python3 honeybee_viewer_server.py</pre>
     <h2>Task upload</h2>
     <p style="margin:0 0 8px"><a class="sheet-cta" href="https://docs.google.com/spreadsheets/d/1_TILTW4KthPz1-fysSRlEeV04lYA0m8qznVyz9vCVig/edit?gid=1552775865#gid=1552775865" target="_blank" rel="noopener">📊 Test accounts sheet</a></p>
     <p class="lede" style="margin-top:0">If you need more demo accounts, reach out to @kevin chen.</p>
-    <p class="lede">Build CSV sends the pasted ids to a copy of query 400607 on data source 30. It does not edit the saved query. The page then writes <code>languageCode</code> as en_US, the two model names, and <code>credential_mode</code> as the word single or dual. The dropdown only writes that word. It does not change how many logins are filled. Download CSV writes those fields again from the form, without running Snowflake a second time. Download query saves the SQL with your ids already inside the IN list.</p>
+    <p class="lede">Build CSV sends the pasted ids to a copy of query 400607 on data source 30. It does not edit the saved query. The Model pairs dropdown chooses how many A/B name pairs to write. Pair 1 is Model A 1 and Model B 1, pair 2 is Model A 2 and Model B 2, and so on, up to 10. Each pair becomes its own row for every task. The file still has one <code>model_a_name</code> column and one <code>model_b_name</code> column. The page also writes <code>languageCode</code> as en_US and <code>credential_mode</code> as the word single or dual. That dropdown only writes the word. It does not change how many logins are filled. Download CSV writes the names again from the form, without running Snowflake a second time. Download query saves the SQL with your ids already inside the IN list.</p>
     <div class="card">
       <div class="row">
-        <label class="inl">Model A <input type="text" id="upload-model-a" placeholder="Argon Task"></label>
-        <label class="inl">Model B <input type="text" id="upload-model-b" placeholder="Fable 5.1"></label>
+        <label class="inl">Model pairs
+          <select id="upload-pair-count">
+            <option value="1" selected>1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+          </select>
+        </label>
         <label class="inl">Credential mode
           <select id="upload-credential">
             <option value="single" selected>single</option>
@@ -230,6 +242,7 @@ python3 honeybee_viewer_server.py</pre>
           </select>
         </label>
       </div>
+      <div id="upload-pairs"></div>
       <textarea id="upload-ids" placeholder="Paste task ids, one per line or separated by commas"></textarea>
       <label class="drop" id="upload-accounts" style="margin-top:10px">Drop the test-accounts CSV here (Accounts, Password), or click to browse<input type="file" accept=".csv"></label>
       <p class="lede" id="upload-accounts-status" style="margin:8px 0 0"></p>
@@ -247,7 +260,7 @@ python3 honeybee_viewer_server.py</pre>
         <li>If task type contains “aspirational”, universe must be non-blank. Any other task type may have an empty universe.</li>
         <li>Environment and estimated turns are allowed to be empty. They are never flagged.</li>
         <li>Broken rows stay in the file and are moved to the end. The list under the buttons names the task id and the missing fields. Ids Snowflake did not return have no row, so they are listed on their own. The download is not blocked.</li>
-        <li>With an accounts file, each row gets two different accounts, handed out in file order, two per task, then the list starts over. The same account is never both logins on one row. Passwords are written only into the CSV you download. They are not sent to Redash. With 2,002 accounts, each account is used once through 1,001 tasks.</li>
+        <li>With an accounts file, each output row gets two different accounts, handed out in file order, two per row, then the list starts over. One task with 3 pairs is 3 rows and uses 6 logins. The same account is never both logins on one row. Passwords are written only into the CSV you download. They are not sent to Redash.</li>
       </ul>
     </div>
   </section>
@@ -613,19 +626,45 @@ function loginNote(n){
   const plan=loginPlan(n);
   return "Each account is used at most "+(plan.max===1?"once":plan.max+" times")+".";
 }
+function readPairs(){
+  return [...document.querySelectorAll("#upload-pairs .pair")].map(row=>({
+    a:row.querySelector(".pair-a").value,
+    b:row.querySelector(".pair-b").value
+  }));
+}
+function renderUploadPairs(){
+  const n=Math.min(10, Math.max(1, Number(document.getElementById("upload-pair-count").value)||1));
+  const prev=readPairs();
+  const host=document.getElementById("upload-pairs");
+  host.innerHTML="";
+  for(let i=0;i<n;i++){
+    const div=document.createElement("div");
+    div.className="row pair";
+    div.style.marginTop="8px";
+    div.innerHTML=`<label class="inl">Model A ${i+1} <input type="text" class="pair-a" value="${esc(prev[i]?prev[i].a:"")}" placeholder="Argon Task"></label>`
+      +`<label class="inl">Model B ${i+1} <input type="text" class="pair-b" value="${esc(prev[i]?prev[i].b:"")}" placeholder="Fable 5.1"></label>`;
+    host.appendChild(div);
+  }
+}
+function modelPairs(){
+  return readPairs().map(p=>({a:p.a.trim(), b:p.b.trim()}));
+}
 function stampUpload(rows){
-  const a=document.getElementById("upload-model-a").value.trim();
-  const b=document.getElementById("upload-model-b").value.trim();
+  const pairs=modelPairs();
   const mode=document.getElementById("upload-credential").value;
-  const plan=loginPlan(rows.length);
-  return rows.map((r,i)=>{
+  const expanded=[];
+  for(const r of rows){
+    for(const p of pairs) expanded.push({src:r, a:p.a, b:p.b});
+  }
+  const plan=loginPlan(expanded.length);
+  return expanded.map((item,i)=>{
     const o={};
     for(const h of uploadHeaders){
       if(h==="model_c_name"||h==="model_d_name") continue;
-      o[h]=r[h];
+      o[h]=item.src[h];
     }
-    o.model_a_name=a;
-    o.model_b_name=b;
+    o.model_a_name=item.a;
+    o.model_b_name=item.b;
     o.languageCode="en_US";
     o.credential_mode=mode;
     if(plan){
@@ -673,7 +712,15 @@ function orderUpload(rows){
   return good.concat(bad);
 }
 function drawUpload(stamped, missing){
-  const broken=stamped.filter(r=>uploadIssues(r).length);
+  const broken=[];
+  const seenBreak=new Set();
+  for(const r of stamped){
+    if(!uploadIssues(r).length) continue;
+    const id=(r.og_task_id||"").toLowerCase();
+    if(seenBreak.has(id)) continue;
+    seenBreak.add(id);
+    broken.push(r);
+  }
   const shown=broken.map(r=>({og_task_id:r.og_task_id||"", task_type:r.task_type||"", missing:uploadIssues(r).join(", ")}));
   document.getElementById("upload-out").innerHTML=
     `<div class="stats"><div class="stat ok"><b>${stamped.length}</b><span>rows</span></div><div class="stat ${broken.length?"bad":"ok"}"><b>${broken.length}</b><span>broken</span></div><div class="stat ${missing.length?"bad":""}"><b>${missing.length}</b><span>ids not returned</span></div></div>`
@@ -727,9 +774,8 @@ bindDrop(document.getElementById("upload-accounts"), async files=>{
 });
 document.getElementById("upload-go").onclick=async()=>{
   const status=document.getElementById("upload-status");
-  const modelA=document.getElementById("upload-model-a").value.trim();
-  const modelB=document.getElementById("upload-model-b").value.trim();
-  if(!modelA||!modelB){ status.textContent="Enter a Model A name and a Model B name."; return; }
+  const pairs=modelPairs();
+  if(!pairs.length || pairs.some(p=>!p.a||!p.b)){ status.textContent="Enter a Model A name and a Model B name for every pair."; return; }
   const unique=pastedTaskIds();
   if(!unique.length){ status.textContent="Paste at least one 24-character task id."; return; }
   status.textContent="Running query 400607 for "+unique.length+" tasks…";
@@ -743,11 +789,11 @@ document.getElementById("upload-go").onclick=async()=>{
     uploadMissing=missing;
     const headers=uploadHeaderList();
     const stamped=orderUpload(stampUpload(uploadRows));
-    const broken=stamped.filter(r=>uploadIssues(r).length).length;
+    const broken=new Set(stamped.filter(r=>uploadIssues(r).length).map(r=>(r.og_task_id||"").toLowerCase())).size;
     drawUpload(stamped, missing);
     document.getElementById("upload-dl").disabled=false;
     download("honeybee_task_upload.csv", toCSV(headers, stamped));
-    status.textContent="Downloaded "+stamped.length+" rows. Language is en_US. Credential mode is "+document.getElementById("upload-credential").value+". "+loginNote(stamped.length)+(broken?" "+broken+" broken "+(broken===1?"task is":"tasks are")+" at the end of the CSV.":" No broken tasks.");
+    status.textContent="Downloaded "+stamped.length+" rows ("+uploadRows.length+" tasks × "+pairs.length+" "+(pairs.length===1?"pair":"pairs")+"). Language is en_US. Credential mode is "+document.getElementById("upload-credential").value+". "+loginNote(stamped.length)+(broken?" "+broken+" broken "+(broken===1?"task is":"tasks are")+" at the end of the CSV.":" No broken tasks.");
   }catch(e){ status.textContent=e.message; }
   finally{ document.getElementById("upload-go").disabled=false; }
 };
@@ -755,11 +801,13 @@ document.getElementById("upload-dl").onclick=()=>{
   const status=document.getElementById("upload-status");
   if(!uploadRows.length) return;
   try{
+    const pairs=modelPairs();
+    if(!pairs.length || pairs.some(p=>!p.a||!p.b)){ status.textContent="Enter a Model A name and a Model B name for every pair."; return; }
     const stamped=orderUpload(stampUpload(uploadRows));
-    const broken=stamped.filter(r=>uploadIssues(r).length).length;
+    const broken=new Set(stamped.filter(r=>uploadIssues(r).length).map(r=>(r.og_task_id||"").toLowerCase())).size;
     drawUpload(stamped, uploadMissing);
     download("honeybee_task_upload.csv", toCSV(uploadHeaderList(), stamped));
-    status.textContent="Downloaded "+stamped.length+" rows. "+loginNote(stamped.length)+(broken?" "+broken+" broken "+(broken===1?"task is":"tasks are")+" at the end of the CSV.":" No broken tasks.");
+    status.textContent="Downloaded "+stamped.length+" rows ("+uploadRows.length+" tasks × "+pairs.length+" "+(pairs.length===1?"pair":"pairs")+"). "+loginNote(stamped.length)+(broken?" "+broken+" broken "+(broken===1?"task is":"tasks are")+" at the end of the CSV.":" No broken tasks.");
   }catch(e){ status.textContent=e.message; }
 };
 document.getElementById("upload-sql").onclick=async()=>{
@@ -904,6 +952,8 @@ document.getElementById("del-pivot-dl").onclick=()=>{
   download("ultra_deliveries_pivot.csv", toCSV(headers, rows));
 };
 
+document.getElementById("upload-pair-count").onchange=renderUploadPairs;
+renderUploadPairs();
 detectProxy();
 </script>
 </body>

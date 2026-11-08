@@ -326,7 +326,10 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
 "use strict";
 const PROJECT_ID = "6a567b80aaa4d140131eae6c";
 const LOCAL = "http://127.0.0.1:8765";
-const HOSTED = "https://honeybee-ooo-viewer.fly.dev";
+const HOSTED_CANDIDATES = [
+  "https://honeybee-ooo-viewer.onrender.com",
+  "https://honeybee-ooo-viewer.fly.dev"
+];
 const UPLOAD_COLS = ["og_task_id","universe","prompt_id","CUJ","task_type","opening_prompt","input_paths","input_uploads","target_deliverables","rubric_criteria","model_a_name","model_b_name","model_c_name","model_d_name","demo_email","demo_password","demo_email_b","demo_password_b","environment_context","estimated_turns","credential_mode","languageCode"];
 const ID_KEYS = ["task_id","task","TASK","TASK_ID"];
 
@@ -495,7 +498,7 @@ async function detectProxy(){
   const label=document.getElementById("conn");
   const bases=[];
   if(location.protocol.startsWith("http") && location.hostname!=="mila-avag.github.io") bases.push("");
-  if(location.origin!==HOSTED) bases.push(HOSTED);
+  for(const host of HOSTED_CANDIDATES){ if(location.origin!==host) bases.push(host); }
   if(location.origin!==LOCAL) bases.push(LOCAL);
   for(const base of bases){
     try{
@@ -508,12 +511,24 @@ async function detectProxy(){
   proxyBase="";
   label.textContent="Redash: not connected. Link check, Merge files, and Download query still work.";
 }
+function rowsFromResult(j){
+  return {headers:j.columns, retrieved_at:j.retrieved_at||"", rows:j.rows.map(row=>Object.fromEntries(j.columns.map((c,i)=>[c, row[i]==null?"":String(row[i])])))};
+}
 async function runQuery(qid, extra){
   if(!proxyBase) throw new Error("Snowflake is not connected right now. Link check, Merge files, and Download query still work.");
   const r=await fetch(proxyBase+"/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({qid, params:{project_id:PROJECT_ID}}, extra||{}))});
   const j=await r.json();
   if(!r.ok||j.error) throw new Error(j.error||("HTTP "+r.status));
-  return {headers:j.columns, retrieved_at:j.retrieved_at||"", rows:j.rows.map(row=>Object.fromEntries(j.columns.map((c,i)=>[c, row[i]==null?"":String(row[i])])))};
+  if(!j.job_id) return rowsFromResult(j);
+  const deadline=Date.now()+20*60*1000;
+  while(Date.now()<deadline){
+    await new Promise(resolve=>setTimeout(resolve, 2000));
+    const s=await fetch(proxyBase+"/api/jobs/"+j.job_id,{cache:"no-store"});
+    const body=await s.json();
+    if(body.status==="done") return rowsFromResult(body);
+    if(body.status==="error"||body.error) throw new Error(body.error||("HTTP "+s.status));
+  }
+  throw new Error("Snowflake took too long. Try Load saved result.");
 }
 
 /* ---------- link check ---------- */

@@ -20,9 +20,11 @@ import json
 import os
 import re
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
+import uuid
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -101,6 +103,29 @@ def load_key() -> str:
 
 
 KEY = load_key()
+JOBS = {}
+JOBS_LOCK = threading.Lock()
+
+
+def start_job(work) -> str:
+    job_id = uuid.uuid4().hex
+    with JOBS_LOCK:
+        JOBS[job_id] = {"status": "running"}
+        if len(JOBS) > 30:
+            for old in list(JOBS)[:-30]:
+                JOBS.pop(old, None)
+
+    def run():
+        try:
+            result = work()
+            with JOBS_LOCK:
+                JOBS[job_id] = {"status": "done", "result": result}
+        except Exception as err:
+            with JOBS_LOCK:
+                JOBS[job_id] = {"status": "error", "error": str(err)}
+
+    threading.Thread(target=run, daemon=True).start()
+    return job_id
 
 
 def redash(method: str, path: str, body: dict | None = None) -> dict:
@@ -414,9 +439,24 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        if self.path.startswith("/api/health"):
-            return self._json(200, {"ok": True, "key_loaded": bool(KEY), "project_id": PROJECT_ID})
         path = self.path.split("?", 1)[0]
+        if path.startswith("/api/health"):
+            return self._json(200, {"ok": True, "key_loaded": bool(KEY), "project_id": PROJECT_ID})
+        if path.startswith("/api/jobs/"):
+            if not self._origin_ok():
+                return self._json(403, {"error": "origin not allowed"})
+            job_id = path[len("/api/jobs/"):]
+            with JOBS_LOCK:
+                job = JOBS.get(job_id)
+            if not job:
+                return self._json(404, {"error": "job not found"})
+            if job["status"] == "done":
+                body = {"status": "done"}
+                body.update(job["result"])
+                return self._json(200, body)
+            if job["status"] == "error":
+                return self._json(200, {"status": "error", "error": job["error"]})
+            return self._json(200, {"status": "running"})
         if path in ("/", "/index.html", "/honeybee_viewer.html"):
             body = page_file().read_bytes()
             self.send_response(200)
@@ -458,11 +498,9 @@ class Handler(BaseHTTPRequestHandler):
         if max_age < 0:
             max_age = 0
         if not KEY:
-            return self._json(400, {"error": "Redash access is not set up on the helper"})
-        try:
-            return self._json(200, run_query(qid, params, max_age))
-        except Exception as err:
-            return self._json(502, {"error": str(err)})
+            return self._json(400, {"error": "Redash access is not set up"})
+        job_id = start_job(lambda: run_query(qid, params, max_age))
+        return self._json(202, {"job_id": job_id, "status": "running"})
 
 
 def main() -> int:

@@ -2,7 +2,7 @@
 
 Six screens for Honeybee L1 delivery work. Open the Instructions tab for when to use each one.
 
-Open https://honeybee-ooo-viewer.fly.dev/ or https://mila-avag.github.io/honeybee-ooo-viewer/
+Open https://honeybee-ooo-viewer.onrender.com/ or https://mila-avag.github.io/honeybee-ooo-viewer/
 
 - **Instructions.** When to use each tab, and what you need open.
 - **Link check.** Drop a delivery sheet. Get model names, links, and a flag for each side: OK, WRONG LINK, MISSING LINK, or NO LINK AVAILABLE.

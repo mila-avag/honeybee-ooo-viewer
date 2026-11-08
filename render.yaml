@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: honeybee-ooo-viewer
+    runtime: docker
+    plan: free
+    region: oregon
+    healthCheckPath: /api/health
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: REDASH_API_KEY
+        sync: false

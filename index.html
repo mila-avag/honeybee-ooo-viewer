@@ -120,7 +120,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
         <li>A name containing <b>gpt</b> must start with <code>https://chatgpt.com/s</code>. That covers both <code>/s/</code> and <code>/share/</code>. <code>chatgpt.com/c</code> is WRONG LINK.</li>
         <li>Otherwise a name containing <b>claude</b> or <b>fable</b> must start with <code>https://claude.ai/share/</code>.</li>
         <li>Otherwise a name containing <b>argon</b> must start with <code>https://scale-cds-public-us-west-2.s3.amazonaws.com/</code>. Argon is checked before Gemini so “Gemini Argon” is an Argon link.</li>
-        <li>Otherwise a name containing <b>gemini</b> must start with <code>https://share.gemini.google/</code>. <code>gemini.google.com</code> is WRONG LINK.</li>
+        <li>Otherwise a name containing <b>gemini</b> must start with <code>https://share.gemini.google/</code>. <code>gemini.google.com</code> is WRONG LINK. The exception is a name containing <b>monothread</b> (for example “Gemini App Monothread”): an S3 link under <code>https://scale-cds-public-us-west-2.s3.amazonaws.com/</code> is OK for those too.</li>
         <li>A name that matches none of those classes is WRONG LINK, including N/A, even when the URL itself looks fine.</li>
       </ul>
     </div>
@@ -194,7 +194,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
         <li>Name contains <b>gpt</b>: the link must start with <code>https://chatgpt.com/s</code>. That covers <code>/s/</code> and <code>/share/</code>. <code>chatgpt.com/c</code> is WRONG LINK.</li>
         <li>Else name contains <b>claude</b> or <b>fable</b>: the link must start with <code>https://claude.ai/share/</code>.</li>
         <li>Else name contains <b>argon</b>: the link must start with <code>https://scale-cds-public-us-west-2.s3.amazonaws.com/</code>. Argon is tested before Gemini, so “Gemini Argon” is an Argon link.</li>
-        <li>Else name contains <b>gemini</b>: the link must start with <code>https://share.gemini.google/</code>. <code>gemini.google.com</code> is WRONG LINK.</li>
+        <li>Else name contains <b>gemini</b>: the link must start with <code>https://share.gemini.google/</code>. <code>gemini.google.com</code> is WRONG LINK. Names containing <b>monothread</b> (like “Gemini App Monothread”) also accept an S3 link under <code>https://scale-cds-public-us-west-2.s3.amazonaws.com/</code>.</li>
         <li>A name that matches none of those, including N/A, is WRONG LINK even when the URL looks fine.</li>
       </ul>
     </div>
@@ -450,7 +450,7 @@ function linkCheck(name, link){
   if(/gpt/i.test(n)) ok=/^https:\/\/chatgpt\.com\/s/.test(d);
   else if(/claude|fable/i.test(n)) ok=/^https:\/\/claude\.ai\/share\//.test(d);
   else if(/argon/i.test(n)) ok=/^https:\/\/scale-cds-public-us-west-2\.s3\.amazonaws\.com\//.test(d);
-  else if(/gemini/i.test(n)) ok=/^https:\/\/share\.gemini\.google\//.test(d);
+  else if(/gemini/i.test(n)) ok=/^https:\/\/share\.gemini\.google\//.test(d) || (/monothread/i.test(n) && /^https:\/\/scale-cds-public-us-west-2\.s3\.amazonaws\.com\//.test(d));
   return ok ? "OK" : "WRONG LINK";
 }
 function pill(status){

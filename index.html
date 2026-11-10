@@ -102,7 +102,10 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
     <div class="card">
       <h3>What you need</h3>
       <p>Link check and Merge files never call Redash. The CSV stays in this browser. A delivery file can be multiple GB because of <code>debug_info</code> columns. Link check reads the file in a stream and keeps only the id, the two names, and the two links.</p>
-      <p>Build CSV, Load saved result, and Recompute run on the hosted app. Redash access is configured on that server. This page never receives it. The purple header says “Redash: connected” when those buttons can run. Link check, Merge files, and Download query work even when it does not.</p>
+      <p>Build CSV, Load saved result, and Recompute need Redash access. They run through a small helper program that you start on your own computer. The access is set up on that helper, and this page never receives it. Set it up once.</p>
+      <pre>cd honeybee_qc/ooo_handoff/viewer
+python3 honeybee_viewer_server.py</pre>
+      <p>Then open <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a>. The purple header shows the status. “Redash: connected” means the helper is running and has access. The hosted page uses the same helper when it is running. Without it, Link check, Merge files, and Download query still work.</p>
       <p><b>Download query</b> fetches the SQL file that sits next to this page and saves it. It does not run Snowflake. Task upload is data source 30, the same source as saved query 400607. The download fills in the task ids you pasted. It does not edit query 400607. Batch progress and Ultra deliveries are data source 22. Ultra deliveries is saved query 390037.</p>
       <p><b>Load saved result</b> returns the last finished warehouse run. That is a read of a stored result, usually under a second. <b>Recompute</b> runs the SQL again and replaces that stored result. On this project that scan is about 10 minutes. Use Recompute when the queue has moved and the saved time in the status line is too old.</p>
     </div>
@@ -326,10 +329,6 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
 "use strict";
 const PROJECT_ID = "6a567b80aaa4d140131eae6c";
 const LOCAL = "http://127.0.0.1:8765";
-const HOSTED_CANDIDATES = [
-  "https://honeybee-ooo-viewer.onrender.com",
-  "https://honeybee-ooo-viewer.fly.dev"
-];
 const UPLOAD_COLS = ["og_task_id","universe","prompt_id","CUJ","task_type","opening_prompt","input_paths","input_uploads","target_deliverables","rubric_criteria","model_a_name","model_b_name","model_c_name","model_d_name","demo_email","demo_password","demo_email_b","demo_password_b","environment_context","estimated_turns","credential_mode","languageCode"];
 const ID_KEYS = ["task_id","task","TASK","TASK_ID"];
 
@@ -497,9 +496,8 @@ let proxyBase="";
 async function detectProxy(){
   const label=document.getElementById("conn");
   const bases=[];
-  if(location.protocol.startsWith("http") && location.hostname!=="mila-avag.github.io") bases.push("");
-  for(const host of HOSTED_CANDIDATES){ if(location.origin!==host) bases.push(host); }
-  if(location.origin!==LOCAL) bases.push(LOCAL);
+  if(location.protocol==="http:" && (location.hostname==="127.0.0.1"||location.hostname==="localhost")) bases.push("");
+  bases.push(LOCAL);
   for(const base of bases){
     try{
       const r=await fetch(base+"/api/health",{cache:"no-store"});
@@ -509,13 +507,13 @@ async function detectProxy(){
     }catch(e){}
   }
   proxyBase="";
-  label.textContent="Redash: not connected. Link check, Merge files, and Download query still work.";
+  label.textContent="Redash: not connected. Link check and Merge files work on a CSV in your browser. Build CSV, Load saved result, and Recompute need the helper running. Download query still saves the SQL.";
 }
 function rowsFromResult(j){
   return {headers:j.columns, retrieved_at:j.retrieved_at||"", rows:j.rows.map(row=>Object.fromEntries(j.columns.map((c,i)=>[c, row[i]==null?"":String(row[i])])))};
 }
 async function runQuery(qid, extra){
-  if(!proxyBase) throw new Error("Snowflake is not connected right now. Link check, Merge files, and Download query still work.");
+  if(!proxyBase) throw new Error("Snowflake buttons need the helper running. Start it with python3 honeybee_viewer_server.py from the viewer folder, then open http://127.0.0.1:8765 and try again.");
   const r=await fetch(proxyBase+"/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({qid, params:{project_id:PROJECT_ID}}, extra||{}))});
   const j=await r.json();
   if(!r.ok||j.error) throw new Error(j.error||("HTTP "+r.status));

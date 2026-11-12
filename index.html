@@ -122,8 +122,8 @@ python3 honeybee_viewer_server.py</pre>
         <li>A link whose text starts with <code>[No trajectory link</code> is NO LINK AVAILABLE. That is a filled-in placeholder, so it is a different failure from a blank cell.</li>
         <li>A name containing <b>gpt</b> must start with <code>https://chatgpt.com/s</code>. That covers both <code>/s/</code> and <code>/share/</code>. <code>chatgpt.com/c</code> is WRONG LINK.</li>
         <li>Otherwise a name containing <b>claude</b> or <b>fable</b> must start with <code>https://claude.ai/share/</code>.</li>
-        <li>Otherwise a name containing <b>argon</b> must start with <code>https://scale-cds-public-us-west-2.s3.amazonaws.com/</code>. Argon is checked before Gemini so “Gemini Argon” is an Argon link.</li>
-        <li>Otherwise a name containing <b>gemini</b> must start with <code>https://share.gemini.google/</code>. <code>gemini.google.com</code> is WRONG LINK. The exception is a name containing <b>monothread</b> (for example “Gemini App Monothread”): an S3 link under <code>https://scale-cds-public-us-west-2.s3.amazonaws.com/</code> is OK for those too.</li>
+        <li>Otherwise a name containing <b>argon</b> or <b>monothread</b> accepts either an S3 link under <code>https://scale-cds-public-us-west-2.s3.amazonaws.com/</code> or a Gemini share link under <code>https://share.gemini.google/</code>. This is checked before a plain Gemini name, so “Gemini Argon” and “Gemini App Monothread” both allow either link.</li>
+        <li>Otherwise a name containing <b>gemini</b> must start with <code>https://share.gemini.google/</code>. <code>gemini.google.com</code> is WRONG LINK.</li>
         <li>A name that matches none of those classes is WRONG LINK, including N/A, even when the URL itself looks fine.</li>
       </ul>
     </div>
@@ -196,8 +196,8 @@ python3 honeybee_viewer_server.py</pre>
         <li>Link text starts with <code>[No trajectory link</code>: NO LINK AVAILABLE. That cell is filled in. It is a different failure from a blank cell.</li>
         <li>Name contains <b>gpt</b>: the link must start with <code>https://chatgpt.com/s</code>. That covers <code>/s/</code> and <code>/share/</code>. <code>chatgpt.com/c</code> is WRONG LINK.</li>
         <li>Else name contains <b>claude</b> or <b>fable</b>: the link must start with <code>https://claude.ai/share/</code>.</li>
-        <li>Else name contains <b>argon</b>: the link must start with <code>https://scale-cds-public-us-west-2.s3.amazonaws.com/</code>. Argon is tested before Gemini, so “Gemini Argon” is an Argon link.</li>
-        <li>Else name contains <b>gemini</b>: the link must start with <code>https://share.gemini.google/</code>. <code>gemini.google.com</code> is WRONG LINK. Names containing <b>monothread</b> (like “Gemini App Monothread”) also accept an S3 link under <code>https://scale-cds-public-us-west-2.s3.amazonaws.com/</code>.</li>
+        <li>Else name contains <b>argon</b> or <b>monothread</b>: the link may start with <code>https://scale-cds-public-us-west-2.s3.amazonaws.com/</code> or <code>https://share.gemini.google/</code>. This is tested before a plain Gemini name, so “Gemini Argon” and “Gemini App Monothread” allow either link.</li>
+        <li>Else name contains <b>gemini</b>: the link must start with <code>https://share.gemini.google/</code>. <code>gemini.google.com</code> is WRONG LINK.</li>
         <li>A name that matches none of those, including N/A, is WRONG LINK even when the URL looks fine.</li>
       </ul>
     </div>
@@ -448,8 +448,8 @@ function linkCheck(name, link){
   let ok=false;
   if(/gpt/i.test(n)) ok=/^https:\/\/chatgpt\.com\/s/.test(d);
   else if(/claude|fable/i.test(n)) ok=/^https:\/\/claude\.ai\/share\//.test(d);
-  else if(/argon/i.test(n)) ok=/^https:\/\/scale-cds-public-us-west-2\.s3\.amazonaws\.com\//.test(d);
-  else if(/gemini/i.test(n)) ok=/^https:\/\/share\.gemini\.google\//.test(d) || (/monothread/i.test(n) && /^https:\/\/scale-cds-public-us-west-2\.s3\.amazonaws\.com\//.test(d));
+  else if(/argon|monothread/i.test(n)) ok=/^https:\/\/scale-cds-public-us-west-2\.s3\.amazonaws\.com\//.test(d) || /^https:\/\/share\.gemini\.google\//.test(d);
+  else if(/gemini/i.test(n)) ok=/^https:\/\/share\.gemini\.google\//.test(d);
   return ok ? "OK" : "WRONG LINK";
 }
 function pill(status){

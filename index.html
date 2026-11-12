@@ -298,6 +298,8 @@ python3 honeybee_viewer_server.py</pre>
         <li><b>Model A minutes per task.</b> Average time for that model A, repeated on every row of that model. It is a property of model A, not of the pair.</li>
         <li><b>Pair minutes per task.</b> Average time for this model A and model B pair.</li>
         <li><b>Total tasks.</b> Delivered, plus pending review, plus still in attempt. The Total row sums this column only. The other cells on that row are blank so a sum of averages is not shown as a total.</li>
+        <li><b>Last delivered (PT).</b> The newest delivery inside the window. Rows are ordered by each Model A's newest delivery, newest first, until you click a column header.</li>
+        <li><b>One row per Model A.</b> Adds up the counts across that model's Model B pairs and lists the Model Bs in one cell. Pair minutes per task is left out of this view because it belongs to a single pair. Untick it to see one row per pair.</li>
       </ul>
     </div>
     <div class="card">
@@ -312,6 +314,7 @@ python3 honeybee_viewer_server.py</pre>
             <option value="168">24 weeks</option>
           </select>
         </label>
+        <label class="inl"><input type="checkbox" id="del-merge" checked> One row per Model A</label>
         <div class="pivot-bar" id="del-tools"></div>
         <button class="b p" id="del-cached">Load saved result</button>
         <button class="b" id="del-go">Recompute (about 10 min)</button>
@@ -1090,9 +1093,10 @@ function lookbackDays(){ return Number(document.getElementById("del-lookback").v
 function deliveryPivot(){
   const days=delLoadedDays||lookbackDays();
   const label=days===60?"Delivered, last 60 days":"Delivered, last "+days+" days";
-  return [
+  const cols=[
     ["MODEL_A_NAME","Model A"],
     ["MODEL_B_NAME","Model B"],
+    ["LAST_DELIVERED_AT","Last delivered (PT)"],
     ["DELIVERED_LAST_21D",label],
     ["PENDING_TO_DELIVER","Pending review (L8, L10, L12)"],
     ["DELIVERED_PLUS_PENDING","Delivered + pending review"],
@@ -1101,26 +1105,45 @@ function deliveryPivot(){
     ["PAIR_TOTAL_MINS_PER_TASK","Pair minutes per task"],
     ["TOTAL","Total tasks"]
   ];
+  return mergeByModelA() ? cols.filter(([k])=>k!=="PAIR_TOTAL_MINS_PER_TASK") : cols;
 }
+const DEL_SUMMED=["DELIVERED_LAST_21D","PENDING_TO_DELIVER","DELIVERED_PLUS_PENDING","PENDING_IN_ATTEMPT","TOTAL"];
+function mergeByModelA(){ return document.getElementById("del-merge").checked; }
 function num(v){ const n=Number(v); return Number.isFinite(n)?n:0; }
+function newer(a, b){ return String(a||"")>String(b||"")?String(a||""):String(b||""); }
 function drawDeliveries(){
   const DEL_PIVOT=deliveryPivot();
   const namesA=uniqSorted(delRows.map(r=>r.MODEL_A_NAME||""));
   const namesB=uniqSorted(delRows.map(r=>r.MODEL_B_NAME||""));
+  const merge=mergeByModelA();
   const groups=new Map();
+  const latestA=new Map();
   for(const r of delRows){
     const a=r.MODEL_A_NAME||"", b=r.MODEL_B_NAME||"";
     if(!allows(delView,"MODEL_A_NAME",a) || !allows(delView,"MODEL_B_NAME",b)) continue;
-    const key=DEL_PIVOT.slice(0,-1).map(([k])=>r[k]||"").join("\u0001");
+    latestA.set(a, newer(latestA.get(a), r.LAST_DELIVERED_AT));
+    const key=merge?a:a+"\u0001"+b;
     if(!groups.has(key)){
-      const row={};
-      for(const [k] of DEL_PIVOT) row[k]=r[k]||"";
-      row.TOTAL=0;
+      const row={_bs:new Map()};
+      for(const [k] of DEL_PIVOT) row[k]=r[k]??"";
+      for(const k of DEL_SUMMED) row[k]=0;
+      row.LAST_DELIVERED_AT="";
       groups.set(key, row);
     }
-    groups.get(key).TOTAL+=num(r.TOTAL);
+    const g=groups.get(key);
+    for(const k of DEL_SUMMED) g[k]+=num(r[k]);
+    g.LAST_DELIVERED_AT=newer(g.LAST_DELIVERED_AT, r.LAST_DELIVERED_AT);
+    g._bs.set(b, (g._bs.get(b)||0)+num(r.TOTAL));
   }
-  delPivot=[...groups.values()];
+  for(const g of groups.values()){
+    if(merge) g.MODEL_B_NAME=[...g._bs].sort((x,y)=>y[1]-x[1]||x[0].localeCompare(y[0])).map(([b])=>b).join(", ");
+    delete g._bs;
+  }
+  delPivot=[...groups.values()].sort((x,y)=>
+    String(latestA.get(y.MODEL_A_NAME)||"").localeCompare(String(latestA.get(x.MODEL_A_NAME)||""))
+    || String(x.MODEL_A_NAME).localeCompare(String(y.MODEL_A_NAME))
+    || String(y.LAST_DELIVERED_AT).localeCompare(String(x.LAST_DELIVERED_AT))
+    || y.TOTAL-x.TOTAL);
   const total=delPivot.reduce((s,r)=>s+num(r.TOTAL),0);
   const pivotHeaders=DEL_PIVOT.map(([,label])=>label);
   for(const h of [...delView.hidden]) if(!pivotHeaders.includes(h)) delView.hidden.delete(h);
@@ -1177,7 +1200,8 @@ async function loadDeliveries(fresh){
     delLoadedDays=days;
     drawDeliveries();
     const when=data.retrieved_at?new Date(data.retrieved_at).toLocaleString():"";
-    status.textContent=(fresh?"Updated just now. ":(when?("Saved result from "+when+". "):"Saved result loaded. "))+"Window is "+days+" days.";
+    status.textContent=(fresh?"Updated just now. ":(when?("Saved result from "+when+". "):"Saved result loaded. "))+"Window is "+days+" days."
+      +(delRows.length && !delRows.some(r=>r.LAST_DELIVERED_AT)?" This result has no delivery dates. Recompute once to add them.":"");
   }catch(e){ status.textContent=e.message; }
   finally{
     document.getElementById("del-go").disabled=false;
@@ -1186,6 +1210,7 @@ async function loadDeliveries(fresh){
 }
 document.getElementById("del-go").onclick=()=>loadDeliveries(true);
 document.getElementById("del-cached").onclick=()=>loadDeliveries(false);
+document.getElementById("del-merge").onchange=()=>{ if(delRows.length) drawDeliveries(); };
 document.getElementById("del-lookback").onchange=()=>{
   const days=lookbackDays();
   const status=document.getElementById("del-status");

@@ -3,6 +3,7 @@
 -- Delivered means sent in the last {{lookback_days}} days (Pacific), or completed in that window and never sent.
 -- The viewer replaces {{lookback_days}} before running. Default is 60.
 -- Pending review is a task at L8, L10, or L12. Still in attempt has not left the attempt layer.
+-- last_delivered_at is the newest delivery (Pacific) for the pair inside the window.
 
 with pt as (
   select convert_timezone('America/Los_Angeles', current_timestamp()) as now_pt
@@ -18,13 +19,14 @@ sent_batches as (
 ),
 -- Delivered: sent in the last 21 days (PT)
 delivered as (
-  select distinct s.task_id
+  select s.task_id, max(convert_timezone('America/Los_Angeles', s.delivered_at)) as delivered_at
   from sent_batches s, pt
   where convert_timezone('America/Los_Angeles', s.delivered_at) >= dateadd(day, -{{lookback_days}}, pt.now_pt)
+  group by 1
 ),
 -- Completed in the last 21 days (PT) but never in any sent batch, counted as delivered
 completed_undelivered as (
-  select t._id as task_id
+  select t._id as task_id, convert_timezone('America/Los_Angeles', t.completed_at) as delivered_at
   from scale_prod.public_w_deleted.tasks t, pt
   where t.project = '6a567b80aaa4d140131eae6c'
     and not coalesce(t.__deleted, false)
@@ -47,16 +49,16 @@ attempt as (
   where status = 'pending' and review_level = -1
 ),
 all_tasks as (
-  select task_id, 'delivered' as bucket, null as review_level from delivered
+  select task_id, 'delivered' as bucket, null as review_level, delivered_at from delivered
   union all
-  select task_id, 'delivered', null from completed_undelivered
+  select task_id, 'delivered', null, delivered_at from completed_undelivered
   union all
-  select task_id, 'pending', review_level from pending
+  select task_id, 'pending', review_level, null from pending
   union all
-  select task_id, 'attempt', review_level from attempt
+  select task_id, 'attempt', review_level, null from attempt
 ),
 tasks_named as (
-  select a.task_id, a.bucket, a.review_level,
+  select a.task_id, a.bucket, a.review_level, a.delivered_at,
          case coalesce(t.metadata:model_a_name::string, '(null)')
            when 'Gemini GOAT DTE pro_dte_test_arm'          then 'Gemini Test Model'
            when '6 Astra'                                   then 'GPT 6 Astra'
@@ -158,6 +160,7 @@ select n.model_a_name, n.model_b_name,
        count(distinct iff(n.bucket = 'pending' and n.review_level = 8,  n.task_id, null)) as pending_l8,
        count(distinct iff(n.bucket = 'pending' and n.review_level = 10, n.task_id, null)) as pending_l10,
        count(distinct iff(n.bucket = 'pending' and n.review_level = 12, n.task_id, null)) as pending_l12,
+       to_char(max(n.delivered_at), 'YYYY-MM-DD HH24:MI')                       as last_delivered_at,
        -- Model A AHT
        any_value(m.attempt_aht_mins_all)               as model_a_attempt_aht_mins,
     --   any_value(m.attempt_median_mins_all)            as model_a_attempt_median_mins,
@@ -186,4 +189,4 @@ left join model_a_task_time tt on tt.model_a_name = n.model_a_name
 left join pair_aht p           on p.model_a_name = n.model_a_name and p.model_b_name = n.model_b_name
 left join pair_task_time pt2   on pt2.model_a_name = n.model_a_name and pt2.model_b_name = n.model_b_name
 group by 1, 2
-order by delivered_last_21d desc, pending_to_deliver desc
+order by last_delivered_at desc nulls last, delivered_last_21d desc, pending_to_deliver desc

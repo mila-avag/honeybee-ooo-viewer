@@ -63,9 +63,14 @@ tasks_named as (
            when 'Gemini GOAT DTE pro_dte_test_arm'          then 'Gemini Test Model'
            when '6 Astra'                                   then 'GPT 6 Astra'
            when 'GPT-6 Astra'                               then 'GPT 6 Astra'
+           when 'GPT Astra 6'                               then 'GPT 6 Astra'
            when 'Fable 5.1'                                 then 'Claude Fable 5.1'
            when 'Gemini Pro release testing > Model Beetle' then 'Gemini Base'
            when '(AI Studio) Gemini 4 Argon EAP'            then 'Gemini Ai Studio'
+           when 'Gemini App Monothread > Argon'             then 'Gemini App Monothread > Argon'
+           when 'Gemini App Monothread > Argon> Argon'      then 'Gemini App Monothread > Argon'
+           when 'Gemini App Monothread'                     then 'Gemini App Monothread > Argon'
+           when 'Gemini Monothread > Argon'                 then 'Gemini App Monothread > Argon'
            else coalesce(t.metadata:model_a_name::string, '(null)')
          end as model_a_name,
          case coalesce(t.metadata:model_b_name::string, '(null)')
@@ -77,6 +82,8 @@ tasks_named as (
            when 'Gemini Pro release testing > Model Beetle' then 'Gemini Base'
            when 'Gemini Pro Release Testing Model Beetle'   then 'Gemini Base'
            when '(AI Studio) Gemini 4 Argon EAP'            then 'Gemini AI Studio'
+           when 'TASK Argon'                                then 'Gemini Argon Task'
+           when 'Argon Task'                                then 'Gemini Argon Task'
            else coalesce(t.metadata:model_b_name::string, '(null)')
          end as model_b_name
   from all_tasks a

@@ -24,9 +24,14 @@ named AS (
             WHEN 'Gemini GOAT DTE pro_dte_test_arm'          THEN 'Gemini Test Model'
             WHEN '6 Astra'                                   THEN 'GPT 6 Astra'
             WHEN 'GPT-6 Astra'                               THEN 'GPT 6 Astra'
+            WHEN 'GPT Astra 6'                               THEN 'GPT 6 Astra'
             WHEN 'Fable 5.1'                                 THEN 'Claude Fable 5.1'
             WHEN 'Gemini Pro release testing > Model Beetle' THEN 'Gemini Base'
             WHEN '(AI Studio) Gemini 4 Argon EAP'            THEN 'Gemini Ai Studio'
+            WHEN 'Gemini App Monothread > Argon'             THEN 'Gemini App Monothread > Argon'
+            WHEN 'Gemini App Monothread > Argon> Argon'      THEN 'Gemini App Monothread > Argon'
+            WHEN 'Gemini App Monothread'                     THEN 'Gemini App Monothread > Argon'
+            WHEN 'Gemini Monothread > Argon'                 THEN 'Gemini App Monothread > Argon'
             ELSE COALESCE(t.metadata:model_a_name::STRING, '(null)')
         END AS model_a_name,
         CASE COALESCE(t.metadata:model_b_name::STRING, '(null)')
@@ -38,6 +43,8 @@ named AS (
             WHEN 'Gemini Pro release testing > Model Beetle' THEN 'Gemini Base'
             WHEN 'Gemini Pro Release Testing Model Beetle'   THEN 'Gemini Base'
             WHEN '(AI Studio) Gemini 4 Argon EAP'            THEN 'Gemini AI Studio'
+            WHEN 'TASK Argon'                                THEN 'Gemini Argon Task'
+            WHEN 'Argon Task'                                THEN 'Gemini Argon Task'
             ELSE COALESCE(t.metadata:model_b_name::STRING, '(null)')
         END AS model_b_name
     FROM scale_prod.public_w_deleted.tasks t

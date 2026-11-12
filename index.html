@@ -50,6 +50,7 @@ th{position:sticky;top:0;background:var(--accent);color:#fff;text-align:left;pad
 th.sort{cursor:pointer;user-select:none}
 td.num,th.num{text-align:center;font-variant-numeric:tabular-nums}
 td{border-top:1px solid var(--line);padding:5px 8px;vertical-align:top;max-width:340px;overflow-wrap:anywhere}
+td.cell-merged{font-weight:600;background:var(--card);vertical-align:middle}
 .pivot-bar{display:contents}
 .multi{position:relative}
 .multi .panel{position:absolute;top:calc(100% + 4px);left:0;z-index:6;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px;width:280px;max-height:340px;display:flex;flex-direction:column;gap:6px;box-shadow:0 10px 28px rgba(15,23,42,.14)}
@@ -299,7 +300,7 @@ python3 honeybee_viewer_server.py</pre>
         <li><b>Pair minutes per task.</b> Average time for this model A and model B pair.</li>
         <li><b>Total tasks.</b> Delivered, plus pending review, plus still in attempt. The Total row sums this column only. The other cells on that row are blank so a sum of averages is not shown as a total.</li>
         <li><b>Last delivered (PT).</b> The newest delivery inside the window. Rows are ordered by each Model A's newest delivery, newest first, until you click a column header.</li>
-        <li><b>One row per Model A.</b> Adds up the counts across that model's Model B pairs and lists the Model Bs in one cell. Pair minutes per task is left out of this view because it belongs to a single pair. Untick it to see one row per pair.</li>
+        <li><b>Merge Model A cells.</b> Merges the Model A cell across all its Model B pairs into one taller cell. Each Model B keeps its own row and numbers. Untick it to repeat Model A on every row.</li>
       </ul>
     </div>
     <div class="card">
@@ -314,7 +315,7 @@ python3 honeybee_viewer_server.py</pre>
             <option value="168">24 weeks</option>
           </select>
         </label>
-        <label class="inl"><input type="checkbox" id="del-merge" checked> One row per Model A</label>
+        <label class="inl"><input type="checkbox" id="del-merge" checked> Merge Model A cells</label>
         <div class="pivot-bar" id="del-tools"></div>
         <button class="b p" id="del-cached">Load saved result</button>
         <button class="b" id="del-go">Recompute (about 10 min)</button>
@@ -952,30 +953,97 @@ function renderPivot(host, headers, rows, opts){
   const dir=opts.sortDir||1;
   const data=rows.filter(r=>!r._total);
   const foot=rows.filter(r=>r._total);
-  const sorted=data.slice();
-  if(key && sorted.some(r=>Object.prototype.hasOwnProperty.call(r, key))){
-    sorted.sort((a,b)=>{
-      const an=Number(a[key]), bn=Number(b[key]);
-      const c=(Number.isFinite(an)&&Number.isFinite(bn))?an-bn:String(a[key]??"").localeCompare(String(b[key]??""), undefined, {numeric:true});
-      return (c||0)*dir;
-    });
+  let sorted=data.slice();
+  const spanCol=opts.rowspanCol && headers.includes(opts.rowspanCol) ? opts.rowspanCol : null;
+
+  function compareVals(a, b, k, d){
+    const an=Number(a[k]), bn=Number(b[k]);
+    const c=(Number.isFinite(an)&&Number.isFinite(bn)) ? an-bn : String(a[k]??"").localeCompare(String(b[k]??""), undefined, {numeric:true});
+    return (c||0)*d;
   }
+
+  if(!spanCol){
+    if(key && sorted.some(r=>Object.prototype.hasOwnProperty.call(r, key))){
+      sorted.sort((a,b)=>compareVals(a, b, key, dir));
+    }
+  } else {
+    const groupMap=new Map();
+    for(const r of sorted){
+      const gKey=String(r[spanCol]??"");
+      if(!groupMap.has(gKey)) groupMap.set(gKey, []);
+      groupMap.get(gKey).push(r);
+    }
+    for(const groupRows of groupMap.values()){
+      if(key && key!==spanCol){
+        groupRows.sort((a,b)=>compareVals(a, b, key, dir));
+      }
+    }
+    const groups=[...groupMap.entries()];
+    if(key===spanCol){
+      groups.sort(([ka], [kb])=>{
+        return String(ka).localeCompare(String(kb), undefined, {numeric:true})*dir;
+      });
+    } else if(key){
+      groups.sort(([, rowsA], [, rowsB])=>{
+        const c=compareVals(rowsA[0], rowsB[0], key, dir);
+        return c || String(rowsA[0][spanCol]??"").localeCompare(String(rowsB[0][spanCol]??""));
+      });
+    }
+    sorted=groups.flatMap(([, groupRows])=>groupRows);
+  }
+
   if(!headers.length){
     host.innerHTML=`<p class="lede">Every column is hidden. Open Columns and choose one.</p>`;
     return sorted;
   }
   const lim=500, shown=sorted.slice(0,lim);
   const arrow=dir<0?" ▼":" ▲";
-  const paint=(r)=>"<tr>"+headers.map(x=>{
+
+  const spanInfo=new Array(shown.length).fill(1);
+  if(spanCol){
+    let i=0;
+    while(i<shown.length){
+      const val=shown[i][spanCol];
+      let j=i+1;
+      while(j<shown.length && shown[j][spanCol]===val){
+        j++;
+      }
+      const span=j-i;
+      spanInfo[i]=span;
+      for(let k=i+1; k<j; k++) spanInfo[k]=0;
+      i=j;
+    }
+  }
+
+  const paintBodyRow=(r, idx)=>{
+    let cells="";
+    for(const x of headers){
+      if(spanCol && x===spanCol){
+        const span=spanInfo[idx];
+        if(span===0) continue;
+        const v=r[x]==null?"":String(r[x]);
+        const spanAttr=span>1?` rowspan="${span}"`:"";
+        const cls=[numeric.has(x)?"num":"", span>1?"cell-merged":""].filter(Boolean).join(" ");
+        cells+=`<td${spanAttr}${cls?` class="${cls}"`:""}>${esc(v.length>180?v.slice(0,180)+"…":v)}</td>`;
+      } else {
+        const v=r[x]==null?"":String(r[x]);
+        cells+=`<td class="${numeric.has(x)?"num":""}">${esc(v.length>180?v.slice(0,180)+"…":v)}</td>`;
+      }
+    }
+    return `<tr>${cells}</tr>`;
+  };
+
+  const paintFootRow=(r)=>"<tr>"+headers.map(x=>{
     const v=r[x]==null?"":String(r[x]);
     return `<td class="${numeric.has(x)?"num":""}">${esc(v.length>180?v.slice(0,180)+"…":v)}</td>`;
   }).join("")+"</tr>";
+
   let h=`<div class="tw"><table><thead><tr>${headers.map(x=>{
     const cls=["sort"]; if(numeric.has(x)) cls.push("num");
     return `<th class="${cls.join(" ")}" data-k="${esc(x)}">${esc(x)}${key===x?arrow:""}</th>`;
   }).join("")}</tr></thead><tbody>`;
-  for(const r of shown) h+=paint(r);
-  for(const r of foot) h+=paint(r);
+  for(let i=0; i<shown.length; i++) h+=paintBodyRow(shown[i], i);
+  for(const r of foot) h+=paintFootRow(r);
   h+="</tbody></table></div>";
   if(data.length>lim) h+=`<p class="lede">Showing ${lim} of ${data.length}. Download has every row.</p>`;
   host.innerHTML=h;
@@ -1093,7 +1161,7 @@ function lookbackDays(){ return Number(document.getElementById("del-lookback").v
 function deliveryPivot(){
   const days=delLoadedDays||lookbackDays();
   const label=days===60?"Delivered, last 60 days":"Delivered, last "+days+" days";
-  const cols=[
+  return [
     ["MODEL_A_NAME","Model A"],
     ["MODEL_B_NAME","Model B"],
     ["LAST_DELIVERED_AT","Last delivered (PT)"],
@@ -1105,9 +1173,7 @@ function deliveryPivot(){
     ["PAIR_TOTAL_MINS_PER_TASK","Pair minutes per task"],
     ["TOTAL","Total tasks"]
   ];
-  return mergeByModelA() ? cols.filter(([k])=>k!=="PAIR_TOTAL_MINS_PER_TASK") : cols;
 }
-const DEL_SUMMED=["DELIVERED_LAST_21D","PENDING_TO_DELIVER","DELIVERED_PLUS_PENDING","PENDING_IN_ATTEMPT","TOTAL"];
 function mergeByModelA(){ return document.getElementById("del-merge").checked; }
 function num(v){ const n=Number(v); return Number.isFinite(n)?n:0; }
 function newer(a, b){ return String(a||"")>String(b||"")?String(a||""):String(b||""); }
@@ -1116,41 +1182,30 @@ function drawDeliveries(){
   const namesA=uniqSorted(delRows.map(r=>r.MODEL_A_NAME||""));
   const namesB=uniqSorted(delRows.map(r=>r.MODEL_B_NAME||""));
   const merge=mergeByModelA();
-  const groups=new Map();
   const latestA=new Map();
+  const filtered=[];
   for(const r of delRows){
-    const a=r.MODEL_A_NAME||"", b=r.MODEL_B_NAME||"";
+    const a=(r.MODEL_A_NAME||"").trim(), b=(r.MODEL_B_NAME||"").trim();
     if(!allows(delView,"MODEL_A_NAME",a) || !allows(delView,"MODEL_B_NAME",b)) continue;
     latestA.set(a, newer(latestA.get(a), r.LAST_DELIVERED_AT));
-    const key=merge?a:a+"\u0001"+b;
-    if(!groups.has(key)){
-      const row={_bs:new Map()};
-      for(const [k] of DEL_PIVOT) row[k]=r[k]??"";
-      for(const k of DEL_SUMMED) row[k]=0;
-      row.LAST_DELIVERED_AT="";
-      groups.set(key, row);
-    }
-    const g=groups.get(key);
-    for(const k of DEL_SUMMED) g[k]+=num(r[k]);
-    g.LAST_DELIVERED_AT=newer(g.LAST_DELIVERED_AT, r.LAST_DELIVERED_AT);
-    g._bs.set(b, (g._bs.get(b)||0)+num(r.TOTAL));
+    filtered.push(r);
   }
-  for(const g of groups.values()){
-    if(merge) g.MODEL_B_NAME=[...g._bs].sort((x,y)=>y[1]-x[1]||x[0].localeCompare(y[0])).map(([b])=>b).join(", ");
-    delete g._bs;
-  }
-  delPivot=[...groups.values()].sort((x,y)=>
-    String(latestA.get(y.MODEL_A_NAME)||"").localeCompare(String(latestA.get(x.MODEL_A_NAME)||""))
-    || String(x.MODEL_A_NAME).localeCompare(String(y.MODEL_A_NAME))
-    || String(y.LAST_DELIVERED_AT).localeCompare(String(x.LAST_DELIVERED_AT))
-    || y.TOTAL-x.TOTAL);
+  filtered.sort((x,y)=>{
+    const aX=(x.MODEL_A_NAME||"").trim(), aY=(y.MODEL_A_NAME||"").trim();
+    return String(latestA.get(aY)||"").localeCompare(String(latestA.get(aX)||""))
+      || aX.localeCompare(aY)
+      || String(y.LAST_DELIVERED_AT||"").localeCompare(String(x.LAST_DELIVERED_AT||""))
+      || num(y.TOTAL)-num(x.TOTAL)
+      || String(x.MODEL_B_NAME||"").localeCompare(String(y.MODEL_B_NAME||""));
+  });
+  delPivot=filtered;
   const total=delPivot.reduce((s,r)=>s+num(r.TOTAL),0);
   const pivotHeaders=DEL_PIVOT.map(([,label])=>label);
   for(const h of [...delView.hidden]) if(!pivotHeaders.includes(h)) delView.hidden.delete(h);
   delVisible=visibleOf(pivotHeaders, delView.hidden);
   const pivotRows=delPivot.map(r=>{
     const o={};
-    for(const [k,label] of DEL_PIVOT) o[label]=k==="TOTAL"?r.TOTAL:r[k];
+    for(const [k,label] of DEL_PIVOT) o[label]=k==="TOTAL"?num(r.TOTAL):r[k];
     return o;
   });
   const totalRow={_total:true};
@@ -1177,15 +1232,17 @@ function drawDeliveries(){
     onNone:()=>{ delView.hidden=new Set(pivotHeaders); drawDeliveries(); }
   });
   const textCols=new Set(["Model A","Model B"]);
-  delPivot=renderPivot(document.getElementById("del-pivot"), delVisible, pivotRows.concat([totalRow]), {
+  const rendered=renderPivot(document.getElementById("del-pivot"), delVisible, pivotRows.concat([totalRow]), {
     numeric:delVisible.filter(h=>!textCols.has(h)),
     sortKey:delView.sortKey, sortDir:delView.sortDir,
+    rowspanCol:merge?"Model A":null,
     onSort:(key)=>{
       if(delView.sortKey===key) delView.sortDir*=-1;
       else { delView.sortKey=key; delView.sortDir=textCols.has(key)?1:-1; }
       drawDeliveries();
     }
   });
+  delPivot=rendered;
   document.getElementById("del-pivot-dl").disabled=delPivot.length===0;
 }
 async function loadDeliveries(fresh){

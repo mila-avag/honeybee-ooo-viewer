@@ -16,7 +16,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Inter,system-
 header{background:#312e81;color:#fff;padding:18px 22px 14px}
 header h1{margin:0;font-size:22px}
 header p{margin:4px 0 0;opacity:.88;font-size:13px}
-nav{display:flex;gap:6px;padding:10px 16px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2}
+nav{display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2}
 nav button{border:0;background:transparent;color:var(--mid);font:inherit;font-weight:600;padding:8px 12px;border-radius:8px;cursor:pointer}
 nav button.active{background:var(--tint);color:var(--accent)}
 main{max-width:1280px;margin:0 auto;padding:20px 16px 48px}
@@ -95,6 +95,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
 <nav>
   <button data-tab="help" class="active">Instructions</button>
   <button data-tab="links">Link check</button>
+  <button data-tab="preview">Delivery check</button>
   <button data-tab="merge">Merge files</button>
   <button data-tab="upload">Task upload</button>
   <button data-tab="batch">Batch progress</button>
@@ -107,7 +108,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
 
     <div class="card">
       <h3>What you need</h3>
-      <p>Link check and Merge files never call Redash. The CSV stays in this browser. A delivery file can be multiple GB because of <code>debug_info</code> columns. Link check reads the file in a stream and keeps only the id, the two names, and the two links.</p>
+      <p>Link check, Delivery check, and Merge files never call Redash. The CSV stays in this browser. A delivery file can be multiple GB because of <code>debug_info</code> columns. Link check reads the file in a stream and keeps only the id, the two names, and the two links. Delivery check keeps the two names and only whether each debug cell is filled.</p>
       <p>Build CSV, Load saved result, and Recompute need Redash access. They run through a small helper program that you start on your own computer. The access is set up on that helper, and this page never receives it. Set it up once.</p>
       <pre>cd honeybee_qc/ooo_handoff/viewer
 python3 honeybee_viewer_server.py</pre>
@@ -131,6 +132,19 @@ python3 honeybee_viewer_server.py</pre>
         <li>Otherwise a name containing <b>argon</b> or <b>monothread</b> accepts either an S3 link under <code>https://scale-cds-public-us-west-2.s3.amazonaws.com/</code> or a Gemini share link under <code>https://share.gemini.google/</code>. This is checked before a plain Gemini name, so “Gemini Argon” and “Gemini App Monothread” both allow either link.</li>
         <li>Otherwise a name containing <b>gemini</b> or <b>nightcrawler</b> (such as “Flash Nightcrawler” or “Flash Nightcrawler Task”) must start with <code>https://share.gemini.google/</code>. <code>gemini.google.com</code> is WRONG LINK.</li>
         <li>A name that matches none of those classes is WRONG LINK, including N/A, even when the URL itself looks fine.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Delivery check</h3>
+      <p><b>When.</b> You have a delivery CSV and want a count of tasks in each Model A / Model B pair, plus how many of those tasks have debug info on each side.</p>
+      <p><b>Need.</b> A delivery CSV. The file can be multiple GB. Nothing is sent to Redash.</p>
+      <p><b>You get.</b> Three tables. The pair table is one row per Model A and Model B combination, with the task count and the debug split for each side. The Model A table adds a model across every pair it appears in, and counts how many of its tasks have <code>debug_info_model_a</code> filled. The Model B table does the same with <code>debug_info_model_b</code>.</p>
+      <ul class="explain">
+        <li>Names come from <code>model_a_name</code> or <code>product_a</code>, and <code>model_b_name</code> or <code>product_b</code>. A blank name is shown as (blank).</li>
+        <li>A side has debug info when its debug cell has text. A blank cell counts as missing. So do cells whose only text is <code>null</code>, <code>none</code>, <code>n/a</code>, <code>[]</code>, or <code>{}</code>.</li>
+        <li>A debug cell bigger than 256 KB still counts as present. The page does not keep the debug text.</li>
+        <li>Each row of the CSV is one task. Download CSV saves the pair table.</li>
       </ul>
     </div>
 
@@ -206,6 +220,28 @@ python3 honeybee_viewer_server.py</pre>
         <li>Else name contains <b>gemini</b> or <b>nightcrawler</b> (such as “Flash Nightcrawler” or “Flash Nightcrawler Task”): the link must start with <code>https://share.gemini.google/</code>. <code>gemini.google.com</code> is WRONG LINK.</li>
         <li>A name that matches none of those, including N/A, is WRONG LINK even when the URL looks fine.</li>
       </ul>
+    </div>
+  </section>
+
+  <section id="preview">
+    <h2>Delivery check</h2>
+    <p class="lede">Drop a delivery CSV. The page counts tasks in each Model A / Model B pair, then counts how many Model A tasks have <code>debug_info_model_a</code> filled and how many do not. It does the same for Model B with <code>debug_info_model_b</code>. The file stays in this browser. A multi-GB file is fine: the reader keeps the two names and only whether each debug cell is filled.</p>
+    <div class="card">
+      <label class="drop" id="preview-drop">Drop a delivery CSV here, or click to browse<input type="file" accept=".csv"></label>
+      <div id="preview-stats"></div>
+      <div class="row" id="preview-actions" hidden>
+        <button class="b" id="preview-dl">Download pair CSV</button>
+        <span class="lede" id="preview-file" style="margin:0"></span>
+      </div>
+      <h3>Each pair</h3>
+      <p class="lede">One row per Model A and Model B combination. Tasks is the number of CSV rows with that pair. The debug columns split those same rows.</p>
+      <div id="preview-pairs"></div>
+      <h3 style="margin-top:16px">Model A</h3>
+      <p class="lede">One row per Model A name, added across every pair it appears in. Has debug means <code>debug_info_model_a</code> is filled. Missing debug means that cell is blank, or only <code>null</code>, <code>none</code>, <code>n/a</code>, <code>[]</code>, or <code>{}</code>. A cell over 256 KB still counts as filled.</p>
+      <div id="preview-a"></div>
+      <h3 style="margin-top:16px">Model B</h3>
+      <p class="lede">One row per Model B name, added across every pair it appears in. Has debug means <code>debug_info_model_b</code> is filled. The same empty values count as missing.</p>
+      <div id="preview-b"></div>
     </div>
   </section>
 
@@ -369,18 +405,24 @@ function pastedTaskIds(){
 /* READCSV_START */
 async function readCSV(file, opts){
   opts=opts||{};
-  const keep=opts.keep?new Set(opts.keep.map(s=>s.toLowerCase())):null;
+  const norm=s=>s.toLowerCase().replace(/\s+/g,"_");
+  const keep=opts.keep?new Set(opts.keep.map(norm)):null;
+  const flag=opts.flag?new Set(opts.flag.map(norm)):null;
   const maxCell=opts.maxCell==null?262144:opts.maxCell;
   const reader=file.stream().getReader();
   const dec=new TextDecoder("utf-8");
-  let quoted=false, field="", skip="", row=[], rows=[], headers=null, keepIdx=null, bom=true, bytes=0, lastPaint=0, trimmed=0;
+  let quoted=false, field="", skip="", row=[], rows=[], headers=null, keepIdx=null, flagIdx=null, bom=true, bytes=0, lastPaint=0, trimmed=0;
   const total=file.size||1;
   function arm(){
     if(keepIdx && headers && !keepIdx[row.length]) skip="keep";
   }
   function endField(){
-    if(skip==="size") trimmed++;
-    row.push(skip?"":field);
+    const flagged=flagIdx && flagIdx[row.length];
+    let value="";
+    if(flagged) value=(skip==="size" || hasDebug(field)) ? "1" : "";
+    else if(!skip) value=field;
+    if(skip==="size" && !flagged) trimmed++;
+    row.push(value);
     field=""; skip="";
   }
   function endRow(){
@@ -388,7 +430,8 @@ async function readCSV(file, opts){
     if(row.length===1 && row[0]===""){ row=[]; arm(); return; }
     if(!headers){
       headers=row.map(h=>h.replace(/^\uFEFF/,"").trim());
-      keepIdx=keep?headers.map(h=>keep.has(h.toLowerCase().replace(/\s+/g,"_"))):null;
+      keepIdx=keep?headers.map(h=>keep.has(norm(h))):null;
+      flagIdx=flag?headers.map(h=>flag.has(norm(h))):null;
       row=[]; arm(); return;
     }
     const o={};
@@ -585,6 +628,120 @@ bindDrop(document.getElementById("link-drop"), async files=>{
 });
 document.getElementById("link-problems").onchange=drawLinks;
 document.getElementById("link-dl").onclick=()=>download("honeybee_link_check.csv", toCSV(LINK_HEADERS, linkRows));
+
+/* ---------- delivery check ---------- */
+/* PREVIEW_START */
+const PREVIEW_KEEP=["task_id","task","model_a_name","product_a","model_b_name","product_b","debug_info_model_a","debug_info_model_b","debug_info_a","debug_info_b","model_a_debug_info","model_b_debug_info"];
+const PREVIEW_FLAG=["debug_info_model_a","debug_info_model_b","debug_info_a","debug_info_b","model_a_debug_info","model_b_debug_info"];
+const PREVIEW_PAIR_HEADERS=["Model A","Model B","Tasks","A has debug","A missing debug","B has debug","B missing debug"];
+const PREVIEW_MODEL_HEADERS=["Model","Tasks","Has debug","Missing debug"];
+let previewPairs=[];
+function hasDebug(v){
+  const s=(v||"").trim();
+  if(!s) return false;
+  return !/^(null|none|n\/a|na|\[\]|\{\}|""|'')$/i.test(s);
+}
+function previewBump(map, key, has){
+  let row=map.get(key);
+  if(!row){ row={tasks:0, has:0}; map.set(key, row); }
+  row.tasks++;
+  if(has) row.has++;
+}
+function summarizeDelivery(table){
+  const an=col(table.headers,["model_a_name","product_a"]);
+  const bn=col(table.headers,["model_b_name","product_b"]);
+  const da=col(table.headers,["debug_info_model_a","debug_info_a","model_a_debug_info"]);
+  const db=col(table.headers,["debug_info_model_b","debug_info_b","model_b_debug_info"]);
+  const pairs=new Map(), modelA=new Map(), modelB=new Map();
+  let aHas=0, bHas=0;
+  for(const r of table.rows){
+    const a=cell(r,an)||"(blank)";
+    const b=cell(r,bn)||"(blank)";
+    const ha=hasDebug(cell(r,da));
+    const hb=hasDebug(cell(r,db));
+    previewBump(pairs, a+"\0"+b, null);
+    const pair=pairs.get(a+"\0"+b);
+    if(ha) pair.aHas=(pair.aHas||0)+1;
+    if(hb) pair.bHas=(pair.bHas||0)+1;
+    previewBump(modelA, a, ha);
+    previewBump(modelB, b, hb);
+    if(ha) aHas++;
+    if(hb) bHas++;
+  }
+  return {an, bn, da, db, pairs, modelA, modelB, aHas, bHas, tasks:table.rows.length};
+}
+function previewRows(map, kind){
+  const rows=[];
+  for(const [key, rec] of map){
+    if(kind==="pair"){
+      const [a,b]=key.split("\0");
+      const aHas=rec.aHas||0, bHas=rec.bHas||0;
+      rows.push({"Model A":a, "Model B":b, Tasks:rec.tasks, "A has debug":aHas, "A missing debug":rec.tasks-aHas, "B has debug":bHas, "B missing debug":rec.tasks-bHas});
+    }else{
+      rows.push({Model:key, Tasks:rec.tasks, "Has debug":rec.has, "Missing debug":rec.tasks-rec.has});
+    }
+  }
+  rows.sort((x,y)=>y.Tasks-x.Tasks || String(x["Model A"]||x.Model).localeCompare(String(y["Model A"]||y.Model)) || String(x["Model B"]||"").localeCompare(String(y["Model B"]||"")));
+  return rows;
+}
+function withPreviewTotal(rows, labelKey, sumKeys){
+  if(!rows.length) return rows;
+  const total={[labelKey]:"Total"};
+  for(const k of sumKeys) total[k]=rows.reduce((s,r)=>s+Number(r[k]||0),0);
+  return rows.concat([total]);
+}
+function renderCountTable(host, headers, rows, numeric){
+  const num=new Set(numeric);
+  if(!rows.length){ host.innerHTML=""; return; }
+  let h=`<div class="tw"><table><thead><tr>${headers.map(x=>`<th class="${num.has(x)?"num":""}">${esc(x)}</th>`).join("")}</tr></thead><tbody>`;
+  for(const r of rows){
+    h+="<tr>"+headers.map(x=>{
+      const v=r[x]==null?"":String(r[x]);
+      return `<td class="${num.has(x)?"num":""}">${esc(v)}</td>`;
+    }).join("")+"</tr>";
+  }
+  h+="</tbody></table></div>";
+  host.innerHTML=h;
+}
+/* PREVIEW_END */
+bindDrop(document.getElementById("preview-drop"), async files=>{
+  const file=files[0]; if(!file) return;
+  const drop=document.getElementById("preview-drop");
+  const label=drop.firstChild && drop.firstChild.nodeType===3 ? drop.firstChild.nodeValue : "";
+  try{
+    setDropText(drop, "Reading "+file.name+"…");
+    const table=await readCSV(file, {keep:PREVIEW_KEEP, flag:PREVIEW_FLAG, onProgress:(p,n)=>setDropText(drop, "Reading "+file.name+" · "+Math.round(p*100)+"% · "+n+" rows")});
+    const summary=summarizeDelivery(table);
+    if(!summary.an||!summary.bn){
+      alert("This sheet needs model names. Looked for product_a / model_a_name and product_b / model_b_name.\n\nFound: "+table.headers.join(", "));
+      return;
+    }
+    if(!summary.tasks){
+      alert("This sheet has a header and no task rows.");
+      return;
+    }
+    const pairRows=previewRows(summary.pairs, "pair");
+    const aRows=previewRows(summary.modelA, "a");
+    const bRows=previewRows(summary.modelB, "b");
+    previewPairs=pairRows;
+    const stat=(labelText, n, kind)=>`<div class="stat ${kind||""}"><b>${n}</b><span>${labelText}</span></div>`;
+    const missingNote=!summary.da||!summary.db
+      ? `<div class="note warn">This file is missing ${[!summary.da&&"<code>debug_info_model_a</code>", !summary.db&&"<code>debug_info_model_b</code>"].filter(Boolean).join(" and ")}. That side is counted as missing debug on every row.</div>`
+      : "";
+    document.getElementById("preview-stats").innerHTML=`<div class="stats">${stat("tasks", summary.tasks)}${stat("pairs", pairRows.length)}${stat("A has debug", summary.aHas,"ok")}${stat("A missing debug", summary.tasks-summary.aHas, summary.tasks-summary.aHas?"bad":"")}${stat("B has debug", summary.bHas,"ok")}${stat("B missing debug", summary.tasks-summary.bHas, summary.tasks-summary.bHas?"bad":"")}</div>${missingNote}`;
+    document.getElementById("preview-actions").hidden=false;
+    document.getElementById("preview-file").textContent=file.name+" · "+summary.tasks+" rows";
+    const pairNums=["Tasks","A has debug","A missing debug","B has debug","B missing debug"];
+    const modelNums=["Tasks","Has debug","Missing debug"];
+    renderCountTable(document.getElementById("preview-pairs"), PREVIEW_PAIR_HEADERS, withPreviewTotal(pairRows, "Model A", pairNums), pairNums);
+    renderCountTable(document.getElementById("preview-a"), PREVIEW_MODEL_HEADERS, withPreviewTotal(aRows, "Model", modelNums), modelNums);
+    renderCountTable(document.getElementById("preview-b"), PREVIEW_MODEL_HEADERS, withPreviewTotal(bRows, "Model", modelNums), modelNums);
+  }catch(e){ alert(e.message); }
+  finally{ setDropText(drop, label); }
+});
+document.getElementById("preview-dl").onclick=()=>{
+  if(previewPairs.length) download("honeybee_delivery_check.csv", toCSV(PREVIEW_PAIR_HEADERS, previewPairs));
+};
 
 /* ---------- merge ---------- */
 let mergeFiles=[];

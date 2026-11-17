@@ -109,10 +109,8 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
     <div class="card">
       <h3>What you need</h3>
       <p>Link check, Delivery check, and Merge files never call Redash. The CSV stays in this browser. A delivery file can be multiple GB because of <code>debug_info</code> columns. Link check reads the file in a stream and keeps only the id, the two names, and the two links. Delivery check keeps the two names and only whether each debug cell is filled.</p>
-      <p>Build CSV, Load saved result, and Recompute need Redash access. They run through a small helper program that you start on your own computer. The access is set up on that helper, and this page never receives it. Set it up once.</p>
-      <pre>cd honeybee_qc/ooo_handoff/viewer
-python3 honeybee_viewer_server.py</pre>
-      <p>Then open <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a>. The purple header shows the status. “Redash: connected” means the helper is running and has access. The hosted page uses the same helper when it is running. Without it, Link check, Merge files, and Download query still work.</p>
+      <p>Build CSV, Load saved result, and Recompute need Redash access. On the hosted page they ask for the viewer password once per browser tab. The site checks that password. This page never receives the Redash key. Link check, Delivery check, Merge files, and Download query work without the password.</p>
+      <p>The purple header shows the status. “Redash: connected” means those Snowflake buttons can run.</p>
       <p><b>Download query</b> fetches the SQL file that sits next to this page and saves it. It does not run Snowflake. Task upload is data source 30, the same source as saved query 400607. The download fills in the task ids you pasted. It does not edit query 400607. Batch progress and Ultra deliveries are data source 22. Ultra deliveries is saved query 390037.</p>
       <p><b>Load saved result</b> returns the last finished warehouse run. That is a read of a stored result, usually under a second. <b>Recompute</b> runs the SQL again and replaces that stored result. On this project that scan is about 10 minutes. Use Recompute when the queue has moved and the saved time in the status line is too old.</p>
     </div>
@@ -374,6 +372,8 @@ python3 honeybee_viewer_server.py</pre>
 "use strict";
 const PROJECT_ID = "6a567b80aaa4d140131eae6c";
 const LOCAL = "http://127.0.0.1:8765";
+// Vercel-hosted helper. Used when the page is on GitHub Pages.
+const HELPER = "https://honeybee-ooo-viewer.vercel.app";
 const UPLOAD_COLS = ["og_task_id","universe","prompt_id","CUJ","task_type","opening_prompt","input_paths","input_uploads","target_deliverables","rubric_criteria","model_a_name","model_b_name","model_c_name","model_d_name","demo_email","demo_password","demo_email_b","demo_password_b","environment_context","estimated_turns","credential_mode","languageCode"];
 const ID_KEYS = ["task_id","task","TASK","TASK_ID"];
 
@@ -548,32 +548,59 @@ let proxyBase="";
 async function detectProxy(){
   const label=document.getElementById("conn");
   const bases=[];
+  if(location.hostname.endsWith(".vercel.app")) bases.push("");
   if(location.protocol==="http:" && (location.hostname==="127.0.0.1"||location.hostname==="localhost")) bases.push("");
+  bases.push(HELPER);
   bases.push(LOCAL);
   for(const base of bases){
     try{
       const r=await fetch(base+"/api/health",{cache:"no-store"});
       const j=await r.json();
-      if(j.ok && j.key_loaded){ proxyBase=base; label.textContent="Redash: connected. Build CSV, Load saved result, and Recompute can run."; return; }
+      if(j.ok && j.key_loaded){
+        proxyBase=base;
+        label.textContent = hostedHelper(base)
+          ? "Redash: connected. Build CSV, Load saved result, and Recompute ask for the viewer password once in this tab."
+          : "Redash: connected. Build CSV, Load saved result, and Recompute can run.";
+        return;
+      }
       if(j.ok){ label.textContent="The helper is running, but Redash access is not set up on it, so Snowflake buttons will fail. Link check, Merge files, and Download query still work."; return; }
     }catch(e){}
   }
   proxyBase="";
-  label.textContent="Redash: not connected. Link check and Merge files work on a CSV in your browser. Build CSV, Load saved result, and Recompute need the helper running. Download query still saves the SQL.";
+  label.textContent="Redash: not connected. Link check, Delivery check, and Merge files work on a CSV in your browser. Build CSV, Load saved result, and Recompute need the hosted helper. Download query still saves the SQL.";
+}
+function hostedHelper(base){
+  const b = base===undefined ? proxyBase : base;
+  return b===HELPER || (b==="" && location.hostname.endsWith(".vercel.app"));
 }
 function rowsFromResult(j){
   return {headers:j.columns, retrieved_at:j.retrieved_at||"", rows:j.rows.map(row=>Object.fromEntries(j.columns.map((c,i)=>[c, row[i]==null?"":String(row[i])])))};
 }
+function viewerPassword(){
+  let pw=sessionStorage.getItem("hbViewerPassword");
+  if(!pw){
+    pw=prompt("Viewer password. Ask the owner of this viewer for it. The page keeps it for this browser tab only.");
+    if(!pw) throw new Error("Snowflake buttons need the viewer password.");
+    sessionStorage.setItem("hbViewerPassword", pw);
+  }
+  return pw;
+}
+function forgetPassword(){ sessionStorage.removeItem("hbViewerPassword"); }
 async function runQuery(qid, extra){
-  if(!proxyBase) throw new Error("Snowflake buttons need the helper running. Start it with python3 honeybee_viewer_server.py from the viewer folder, then open http://127.0.0.1:8765 and try again.");
-  const r=await fetch(proxyBase+"/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({qid, params:{project_id:PROJECT_ID}}, extra||{}))});
+  if(!proxyBase) throw new Error("Snowflake buttons are not available right now. Link check, Merge files, and Download query still work.");
+  const headers={"Content-Type":"application/json"};
+  let pw="";
+  if(hostedHelper()){ pw=viewerPassword(); headers["X-Viewer-Password"]=pw; }
+  const r=await fetch(proxyBase+"/api/run",{method:"POST",headers,body:JSON.stringify(Object.assign({qid, params:{project_id:PROJECT_ID}}, extra||{}))});
+  if(r.status===401){ forgetPassword(); throw new Error("Wrong viewer password. Try again."); }
   const j=await r.json();
   if(!r.ok||j.error) throw new Error(j.error||("HTTP "+r.status));
   if(!j.job_id) return rowsFromResult(j);
   const deadline=Date.now()+20*60*1000;
   while(Date.now()<deadline){
     await new Promise(resolve=>setTimeout(resolve, 2000));
-    const s=await fetch(proxyBase+"/api/jobs/"+j.job_id,{cache:"no-store"});
+    const s=await fetch(proxyBase+"/api/jobs/"+j.job_id,{cache:"no-store",headers: pw?{"X-Viewer-Password":pw}:{}});
+    if(s.status===401){ forgetPassword(); throw new Error("Wrong viewer password. Try again."); }
     const body=await s.json();
     if(body.status==="done") return rowsFromResult(body);
     if(body.status==="error"||body.error) throw new Error(body.error||("HTTP "+s.status));

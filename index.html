@@ -544,7 +544,7 @@ document.querySelectorAll("nav button").forEach(b=>{
 });
 
 /* ---------- Redash proxy ---------- */
-let proxyBase="";
+let proxyBase=null;
 async function detectProxy(){
   const label=document.getElementById("conn");
   const bases=[];
@@ -566,7 +566,7 @@ async function detectProxy(){
       if(j.ok){ label.textContent="The helper is running, but Redash access is not set up on it, so Snowflake buttons will fail. Link check, Merge files, and Download query still work."; return; }
     }catch(e){}
   }
-  proxyBase="";
+  proxyBase=null;
   if(location.protocol==="file:"){
     label.textContent="Redash: not connected. This page was opened from a file on your computer, and the Snowflake buttons cannot reach the hosted helper from there. Open https://honeybee-ooo-viewer.vercel.app or https://mila-avag.github.io/honeybee-ooo-viewer/ instead. Link check, Delivery check, and Merge files still work here.";
     return;
@@ -591,7 +591,7 @@ function viewerPassword(){
 }
 function forgetPassword(){ sessionStorage.removeItem("hbViewerPassword"); }
 async function runQuery(qid, extra){
-  if(!proxyBase) throw new Error("Snowflake buttons are not available right now. Link check, Merge files, and Download query still work.");
+  if(proxyBase===null) throw new Error("Snowflake buttons are not available right now. Link check, Merge files, and Download query still work.");
   const headers={"Content-Type":"application/json"};
   let pw="";
   if(hostedHelper()){ pw=viewerPassword(); headers["X-Viewer-Password"]=pw; }

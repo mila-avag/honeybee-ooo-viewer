@@ -567,6 +567,10 @@ async function detectProxy(){
     }catch(e){}
   }
   proxyBase="";
+  if(location.protocol==="file:"){
+    label.textContent="Redash: not connected. This page was opened from a file on your computer, and the Snowflake buttons cannot reach the hosted helper from there. Open https://honeybee-ooo-viewer.vercel.app or https://mila-avag.github.io/honeybee-ooo-viewer/ instead. Link check, Delivery check, and Merge files still work here.";
+    return;
+  }
   label.textContent="Redash: not connected. Link check, Delivery check, and Merge files work on a CSV in your browser. Build CSV, Load saved result, and Recompute need the hosted helper. Download query still saves the SQL.";
 }
 function hostedHelper(base){

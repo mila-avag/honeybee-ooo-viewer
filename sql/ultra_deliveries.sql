@@ -2,7 +2,7 @@
 -- Project 6a567b80aaa4d140131eae6c.
 -- Delivered means sent in the last {{lookback_days}} days (Pacific), or completed in that window and never sent.
 -- The viewer replaces {{lookback_days}} before running. Default is 60.
--- Pending review is a task at L8, L10, or L12. Still in attempt has not left the attempt layer.
+-- Pending review is a task at L1, L8, L10, or L12. Still in attempt has not left the attempt layer.
 -- last_delivered_at is the newest delivery (Pacific) for the pair inside the window.
 
 with pt as (
@@ -42,7 +42,7 @@ latest_node as (
 ),
 pending as (
   select task as task_id, review_level from latest_node
-  where status = 'pending' and review_level in (8, 10, 12)
+  where status = 'pending' and review_level in (1, 8, 10, 12)
 ),
 attempt as (
   select task as task_id, review_level from latest_node
@@ -103,7 +103,7 @@ ta as (
   )
   qualify row_number() over (partition by _id order by src) = 1
 ),
--- One row per task + model pair; is_pending = task is in the L8/L10/L12 pending bucket
+-- One row per task + model pair; is_pending = task is in the L1/L8/L10/L12 pending bucket
 task_model as (
   select task_id, model_a_name, model_b_name, max(iff(bucket = 'pending', 1, 0)) as is_pending
   from tasks_named group by 1, 2, 3
@@ -164,6 +164,7 @@ select n.model_a_name, n.model_b_name,
        count(distinct iff(n.bucket = 'delivered', n.task_id, null))
          + count(distinct iff(n.bucket = 'pending', n.task_id, null))
          + count(distinct iff(n.bucket = 'attempt', n.task_id, null))           as total,
+       count(distinct iff(n.bucket = 'pending' and n.review_level = 1,  n.task_id, null)) as pending_l1,
        count(distinct iff(n.bucket = 'pending' and n.review_level = 8,  n.task_id, null)) as pending_l8,
        count(distinct iff(n.bucket = 'pending' and n.review_level = 10, n.task_id, null)) as pending_l10,
        count(distinct iff(n.bucket = 'pending' and n.review_level = 12, n.task_id, null)) as pending_l12,

@@ -186,7 +186,7 @@ python3 honeybee_viewer_server.py</pre>
       <p>The window defaults to 60 days. The Lookback menu is in weeks, plus the 60-day choice. Changing it does not rerun Snowflake until you load or recompute. The first run for a window takes about 10 minutes. Later loads of that same window use the saved result. Model A and Model B are multi-select filters on the loaded table. Columns can be hidden. A column header sorts the table. The window is Pacific time.</p>
       <ul class="explain">
         <li><b>Delivered.</b> Sent in a delivery batch inside the selected window, or completed in that window and never present in any sent batch.</li>
-        <li><b>Pending review (L8, L10, L12).</b> The latest human node by created_at is pending at one of those three levels.</li>
+        <li><b>Pending review (L1, L8, L10, L12).</b> The latest human node by created_at is pending at one of those four levels.</li>
         <li><b>Delivered + pending review.</b> Those two counts added together.</li>
         <li><b>Still in attempt.</b> The latest human node by created_at is pending at -1. Tasks with no attempt yet are included. Batch progress counts this same set as L-1.</li>
         <li><b>Model A minutes per task.</b> Average of all time spent on tasks for that model A. The same number repeats on every row for that model A, because it is a property of model A, not of the pair.</li>
@@ -334,7 +334,7 @@ python3 honeybee_viewer_server.py</pre>
     <div class="note">
       <ul class="explain">
         <li><b>Delivered.</b> Sent in a delivery batch inside the selected window, or completed in that window and never present in any sent batch.</li>
-        <li><b>Pending review (L8, L10, L12).</b> The latest human node by created_at is pending at one of those three levels.</li>
+        <li><b>Pending review (L1, L8, L10, L12).</b> The latest human node by created_at is pending at one of those four levels.</li>
         <li><b>Delivered + pending review.</b> Those two counts added together.</li>
         <li><b>Still in attempt.</b> The latest human node by created_at is pending at -1. Tasks with no attempt yet are included. Batch progress counts this same set as L-1.</li>
         <li><b>Model A minutes per task.</b> Average time for that model A, repeated on every row of that model. It is a property of model A, not of the pair.</li>
@@ -1337,7 +1337,7 @@ function deliveryPivot(){
     ["MODEL_B_NAME","Model B"],
     ["LAST_DELIVERED_AT","Last delivered (PT)"],
     ["DELIVERED_LAST_21D",label],
-    ["PENDING_TO_DELIVER","Pending review (L8, L10, L12)"],
+    ["PENDING_TO_DELIVER","Pending review (L1, L8, L10, L12)"],
     ["DELIVERED_PLUS_PENDING","Delivered + pending review"],
     ["PENDING_IN_ATTEMPT","Still in attempt"],
     ["MODEL_A_TOTAL_MINS_PER_TASK","Model A minutes per task"],

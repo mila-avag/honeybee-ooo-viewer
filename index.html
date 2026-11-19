@@ -158,7 +158,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
       <p><b>When.</b> You have a list of task ids and need the upload CSV for them.</p>
       <p><b>Need.</b> A Model pairs count, a Model A and Model B name for each pair, a credential mode (single or dual), and the task ids. The Redash server, unless you use Download query and run the SQL on data source 30. For logins, export <a href="https://docs.google.com/spreadsheets/d/1_TILTW4KthPz1-fysSRlEeV04lYA0m8qznVyz9vCVig/edit?gid=1552775865#gid=1552775865" target="_blank" rel="noopener">the test accounts sheet</a> as a CSV with Accounts and Password columns. If you need more demo accounts, reach out to @kevin chen.</p>
       <p><b>You get.</b> <code>honeybee_task_upload.csv</code>. The columns stay <code>model_a_name</code> and <code>model_b_name</code>. Choosing 3 pairs writes 3 rows for every task: row 1 is Model A 1 vs Model B 1, row 2 is Model A 2 vs Model B 2, and so on. Language is en_US on every row. Up to 5,000 ids. Demo logins are filled from the accounts file: the two logins on a row are different accounts, and emails are repeated as little as possible. Accounts stay in the browser and are written only into the CSV you download.</p>
-      <p><b>Customer sheet.</b> Choose Customer sheet. The task id box is not shown. Drop the customer task CSV. Build CSV does not call Redash. It writes the same columns. <code>opening_prompt</code> is Turn 1. <code>target_deliverables</code> and <code>rubric_criteria</code> stay JSON lists, the same shape as a Redash row. Rubric weights are Blocker 3, Rework 2, Polish 1. The rubric category fields (<code>criterion_category</code>, <code>category</code>, <code>subcategory</code>) are null, because the customer file has no category. <code>later_turns</code> is every Turn 2 or later bullet as a JSON list, the same shape as <code>target_deliverables</code>. <code>estimated_turns</code> is the highest turn number in that cell.</p>
+      <p><b>Prompts made by the customer.</b> Choose that source. The task id box is not shown. Drop the customer task CSV. Build CSV does not call Redash. It writes the same columns. <code>opening_prompt</code> is Turn 1. <code>universe</code> is the persona name. <code>CUJ</code> is the CUJ bench source. File names in the grounding cell become the <code>input_paths</code> JSON list. Seeded account text that is not a file stays in <code>environment_context</code>. <code>target_deliverables</code> and <code>rubric_criteria</code> stay JSON lists, the same shape as a Redash row. A file with no rubric column leaves the rubric empty. Rubric weights are Blocker 3, Rework 2, Polish 1. The rubric category fields (<code>criterion_category</code>, <code>category</code>, <code>subcategory</code>) are null, because the customer file has no category. <code>later_turns</code> is every Turn 2 or later bullet as a JSON list, the same shape as <code>target_deliverables</code>. <code>estimated_turns</code> is the highest turn number in that cell. The page then lists every upload column that is still empty, and how many rows are empty.</p>
       <p>After the rows come back, the page checks each one. A list counts as empty when the cell is blank, <code>null</code>, <code>[]</code>, <code>{}</code>, or a JSON list whose items have no title and no id. A list with one real criterion counts as present.</p>
       <ul class="explain">
         <li>Every task needs a non-blank <code>opening_prompt</code>.</li>
@@ -263,12 +263,12 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
     <h2>Task upload</h2>
     <p style="margin:0 0 8px"><a class="sheet-cta" href="https://docs.google.com/spreadsheets/d/1_TILTW4KthPz1-fysSRlEeV04lYA0m8qznVyz9vCVig/edit?gid=1552775865#gid=1552775865" target="_blank" rel="noopener">📊 Test accounts sheet</a></p>
     <p class="lede" style="margin-top:0">If you need more demo accounts, reach out to @kevin chen.</p>
-    <p class="lede">Source chooses which inputs are on the form. Task ids shows the id box, Build CSV, and Download query. Build CSV sends those ids to a copy of query 400607 on data source 30 and does not edit the saved query. Customer sheet hides the id box. Drop the customer CSV, then Build CSV writes the same upload columns from that file and does not call Redash. Turn 1 becomes <code>opening_prompt</code>. The outcome and the rubric stay JSON lists. Later turns go in <code>later_turns</code>, a JSON list in the same shape as the outcome. <code>estimated_turns</code> is the highest turn number in that cell. Both sources use the model pairs, the credential mode, and the accounts file. The Model pairs dropdown chooses how many A/B name pairs to write. Pair 1 is Model A 1 and Model B 1, pair 2 is Model A 2 and Model B 2, and so on, up to 10. Each pair becomes its own row for every task. The file still has one <code>model_a_name</code> column and one <code>model_b_name</code> column. The page also writes <code>languageCode</code> as en_US and <code>credential_mode</code> as the word single or dual. That dropdown only writes the word. It does not change how many logins are filled. Download CSV writes the names again from the form, without running the source a second time. Download query is only on Task ids. It saves the SQL with your ids already inside the IN list.</p>
+    <p class="lede">Source chooses which inputs are on the form. Prompt made by us shows the id box, Build CSV, and Download query. Build CSV sends those ids to a copy of query 400607 on data source 30 and does not edit the saved query. Prompts made by the customer hides the id box. Drop the customer CSV, then Build CSV writes the same upload columns from that file and does not call Redash. Turn 1 becomes <code>opening_prompt</code>. The persona name becomes <code>universe</code>. CUJ bench source becomes <code>CUJ</code>. File names in the grounding cell become <code>input_paths</code>. The outcome and the rubric stay JSON lists. A file with no rubric column leaves <code>rubric_criteria</code> empty. Later turns go in <code>later_turns</code>, a JSON list in the same shape as the outcome. <code>estimated_turns</code> is the highest turn number in that cell. After the file is built, the page lists every column that is still empty. Both sources use the model pairs, the credential mode, and the accounts file. The Model pairs dropdown chooses how many A/B name pairs to write. Pair 1 is Model A 1 and Model B 1, pair 2 is Model A 2 and Model B 2, and so on, up to 10. Each pair becomes its own row for every task. The file still has one <code>model_a_name</code> column and one <code>model_b_name</code> column. The page also writes <code>languageCode</code> as en_US and <code>credential_mode</code> as the word single or dual. That dropdown only writes the word. It does not change how many logins are filled. Download CSV writes the names again from the form, without running the source a second time. Download query is only on Prompt made by us. It saves the SQL with your ids already inside the IN list.</p>
     <div class="card">
       <div class="row" style="margin-bottom:10px">
         <span class="lede" style="margin:0">Source</span>
-        <button type="button" class="b p" id="upload-source-ids">Task ids</button>
-        <button type="button" class="b" id="upload-source-customer">Customer sheet</button>
+        <button type="button" class="b p" id="upload-source-ids">Prompt made by us</button>
+        <button type="button" class="b" id="upload-source-customer">Prompts made by the customer</button>
       </div>
       <div class="row">
         <label class="inl">Model pairs
@@ -297,7 +297,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
         <textarea id="upload-ids" placeholder="Paste task ids, one per line or separated by commas"></textarea>
       </div>
       <div id="upload-customer-block" hidden>
-        <label class="drop" id="upload-gab" style="margin-top:10px">Drop the customer task CSV here (Task ID, Turn 1, Task Outcome, Finalized Task Rubric), or click to browse<input type="file" accept=".csv,text/csv"></label>
+        <label class="drop" id="upload-gab" style="margin-top:10px">Drop the customer task CSV here (Task ID, Turn 1, Task Outcome, and the columns that file has), or click to browse<input type="file" accept=".csv,text/csv"></label>
         <p class="lede" id="upload-gab-status" style="margin:8px 0 0"></p>
       </div>
       <label class="drop" id="upload-accounts" style="margin-top:10px">Drop the test-accounts CSV here (Accounts, Password), or click to browse<input type="file" accept=".csv"></label>
@@ -1055,6 +1055,41 @@ function gabBlankNote(value){
     || s.startsWith("no grounding") || s.startsWith("no persona") || s.startsWith("no pre-seed")
     || s.includes("no persona is needed") || s.includes("no grounding data");
 }
+function gabUniverse(person){
+  if(gabBlankNote(person)) return "";
+  const line=String(person||"").split(/\n/)[0];
+  const name=line.split(":")[0].trim();
+  return gabBlankNote(name)?"":name;
+}
+function gabInputs(ground){
+  if(!ground || gabBlankNote(ground)) return {paths:[], uploads:[], environment:""};
+  const paths=[], uploads=[], env=[];
+  const seenP=new Set(), seenU=new Set();
+  const chunks=gabBullets(ground);
+  const parts=chunks.length?chunks:[String(ground)];
+  const ext=/\.(pdf|png|docx?|xlsx?|pptx?|csv|txt|jpe?g|mp4|zip|html)\b/i;
+  for(const raw of parts){
+    const b=gabTitle(raw);
+    for(const url of (b.match(/https?:\/\/[^\s)]+/g)||[])){
+      const clean=url.replace(/[.,]$/,"");
+      if(!seenU.has(clean)){ seenU.add(clean); uploads.push(clean); }
+    }
+    if(/file you attach|rater file/i.test(b) || ext.test(b)){
+      let head=b.split(/\s+\u2014\s+/)[0];
+      const colon=head.indexOf(":");
+      if(colon>=0) head=head.slice(colon+1);
+      for(const piece of head.split(",")){
+        const name=gabTitle(piece).replace(/^["']|["']$/g,"");
+        if(!name || gabBlankNote(name) || seenP.has(name.toLowerCase())) continue;
+        seenP.add(name.toLowerCase());
+        paths.push(name);
+      }
+    }else{
+      env.push(b);
+    }
+  }
+  return {paths, uploads, environment:env.join("\n")};
+}
 function gabTurns(cell){
   const re=/Turns?\s+(\d+)(?:\s*[\u2013\u2014-]\s*(\d+))?/g;
   const nums=[];
@@ -1078,12 +1113,12 @@ async function gabRowsFromTable(table){
   const outcomeCol=col(headers,["task_outcome_(what_a_good_result_looks_like)","task_outcome","target_deliverables"]);
   const rubricCol=col(headers,["finalized_task_rubric","rubric","rubric_criteria"]);
   const groundCol=col(headers,["grounding_&_data_(before_you_start)","grounding","environment_context"]);
+  const personCol=col(headers,["synthetic_person","vision_persona","universe","persona"]);
   const missing=[];
   if(!idCol) missing.push("Task ID");
   if(!suiteCol) missing.push("Suite Type");
   if(!turnCol) missing.push("Turn 1 (send exactly)");
   if(!outcomeCol) missing.push("Task Outcome (What a good result looks like)");
-  if(!rubricCol) missing.push("Finalized Task Rubric");
   if(missing.length) throw new Error("This file is missing "+missing.join(", ")+". Found: "+headers.join(", "));
   const rubricRe=/^C(\d+)\s*\[(Blocker|Rework|Polish)\]\s*([\s\S]+)$/;
   const warnings=[];
@@ -1098,7 +1133,7 @@ async function gabRowsFromTable(table){
     if(seen.has(taskId)){ warnings.push(taskId+" is repeated and the later row was skipped."); continue; }
     seen.add(taskId);
     const rubric=[];
-    const bullets=gabBullets(cell(src, rubricCol));
+    const bullets=rubricCol?gabBullets(cell(src, rubricCol)):[];
     for(let i=0;i<bullets.length;i++){
       const line=gabTitle(bullets[i]);
       const match=rubricRe.exec(line);
@@ -1122,21 +1157,21 @@ async function gabRowsFromTable(table){
     for(let i=0;i<laterBullets.length;i++){
       later.push({criterion_id:await gabUuid5(taskId+"|later|"+i), title:gabTitle(laterBullets[i])});
     }
-    if(rubric.length<10) shortRubric++;
-    const ground=groundCol?cell(src, groundCol):"";
-    const environment=ground && !gabBlankNote(ground) ? ground : "";
-    if(environment) grounded++;
+    if(rubricCol && rubric.length<10) shortRubric++;
+    const inputs=gabInputs(groundCol?cell(src, groundCol):"");
+    if(inputs.paths.length || inputs.environment) grounded++;
     const row={};
     for(const h of UPLOAD_COLS) row[h]="";
     row.og_task_id=taskId;
+    row.universe=personCol?gabUniverse(cell(src, personCol)):"";
     row.CUJ=cujCol?cell(src, cujCol):"";
     row.task_type=suite.toLowerCase();
     row.opening_prompt=cell(src, turnCol);
-    row.input_paths="[]";
-    row.input_uploads="[]";
+    row.input_paths=JSON.stringify(inputs.paths);
+    row.input_uploads=JSON.stringify(inputs.uploads);
     row.target_deliverables=JSON.stringify(deliverables);
     row.rubric_criteria=JSON.stringify(rubric);
-    row.environment_context=environment;
+    row.environment_context=inputs.environment;
     row.estimated_turns=laterCol?gabTurns(cell(src, laterCol)):"";
     row.later_turns=JSON.stringify(later);
     row.languageCode="en_US";
@@ -1145,28 +1180,49 @@ async function gabRowsFromTable(table){
   const notes=[];
   if(skipped) notes.push("Skipped "+skipped+" note or blank row"+(skipped===1?"":"s")+".");
   notes.push("later_turns is every Turn 2 or later bullet as a JSON list of criterion_id and title, the same shape as target_deliverables. It is a new column, so the Redash upload query does not have it.");
-  notes.push("criterion_category, category, and subcategory are null on every rubric item, because the customer file has no category.");
+  notes.push("universe is the persona name, the text before the colon. CUJ is copied as written.");
+  notes.push("input_paths is the file names from grounding bullets that say to attach a file. Other grounding bullets stay in environment_context. Links in that cell go in input_uploads.");
+  if(rubricCol && out.some(r=>r.rubric_criteria!=="[]")) notes.push("criterion_category, category, and subcategory are null on every rubric item, because the customer file has no category.");
   notes.push("estimated_turns is the highest turn number in that cell, from 1 to 50.");
+  if(!rubricCol) notes.push("This file has no rubric column. rubric_criteria is an empty list. When a Finalized Task Rubric column is added, those lines will be parsed.");
   if(shortRubric) notes.push(shortRubric+" of "+out.length+" tasks have fewer than 10 rubric criteria. The upload step asks for at least 10. Those rows are still in the file.");
   if(unparsed) notes.push(unparsed+" rubric line"+(unparsed===1?" was":"s were")+" not in the C1 [Blocker] shape and "+(unparsed===1?"was":"were")+" kept with weight 1.");
-  if(grounded) notes.push(grounded+" task"+(grounded===1?" has":"s have")+" grounding text in environment_context. This file's input lists stay empty.");
   if(!grounded) notes.push("No grounding text was written. input_paths and input_uploads are empty lists.");
-  notes.push("CUJ is copied as written.");
   return {rows:out, notes:notes.concat(warnings)};
 }
 /* GAB_END */
+function cellEmpty(v){
+  const s=v==null?"":String(v).trim();
+  return !s || s.toLowerCase()==="null" || s==="[]" || s==="{}";
+}
+function drawEmptyColumns(rows, headers){
+  const host=document.getElementById("upload-out");
+  const n=rows.length;
+  const shown=headers.map(h=>({column:h, empty:rows.filter(r=>cellEmpty(r[h])).length}))
+    .filter(r=>r.empty>0)
+    .sort((a,b)=>b.empty-a.empty || a.column.localeCompare(b.column))
+    .map(r=>({column:r.column, empty:r.empty===n?"empty on every row":r.empty+" of "+n+" rows"}));
+  if(!shown.length){
+    host.insertAdjacentHTML("beforeend", `<div class="note">No upload column is empty.</div>`);
+    return 0;
+  }
+  host.insertAdjacentHTML("beforeend", `<h3 style="margin:14px 0 6px;font-size:15px">Empty columns</h3><p class="lede" style="margin:0 0 8px">A cell counts as empty when it is blank, null, [], or {}. Columns filled from the form, such as the model names, are counted after those are written.</p><div id="upload-empty"></div>`);
+  renderRows(document.getElementById("upload-empty"), ["column","empty"], shown);
+  return shown.filter(r=>r.empty==="empty on every row").length;
+}
 function finishUpload(status, sourceLabel){
   const headers=uploadHeaderList();
   const stamped=orderUpload(stampUpload(uploadRows));
   const broken=new Set(stamped.filter(r=>uploadIssues(r).length).map(r=>(r.og_task_id||"").toLowerCase())).size;
   drawUpload(stamped, uploadMissing);
+  const emptyAll=drawEmptyColumns(stamped, headers);
   if(gabNotes.length){
     document.getElementById("upload-out").insertAdjacentHTML("beforeend", `<div class="note">${gabNotes.map(esc).join("<br>")}</div>`);
   }
   document.getElementById("upload-dl").disabled=false;
   download("honeybee_task_upload.csv", toCSV(headers, stamped));
   const pairs=modelPairs();
-  status.textContent="Downloaded "+stamped.length+" rows ("+uploadRows.length+" tasks × "+pairs.length+" "+(pairs.length===1?"pair":"pairs")+")"+(sourceLabel?". "+sourceLabel:"")+". Language is en_US. Credential mode is "+document.getElementById("upload-credential").value+". "+loginNote(stamped.length)+(broken?" "+broken+" broken "+(broken===1?"task is":"tasks are")+" at the end of the CSV.":" No broken tasks.");
+  status.textContent="Downloaded "+stamped.length+" rows ("+uploadRows.length+" tasks × "+pairs.length+" "+(pairs.length===1?"pair":"pairs")+")"+(sourceLabel?". "+sourceLabel:"")+". Language is en_US. Credential mode is "+document.getElementById("upload-credential").value+". "+loginNote(stamped.length)+(broken?" "+broken+" broken "+(broken===1?"task is":"tasks are")+" at the end of the CSV.":" No broken tasks.")+(emptyAll?" "+emptyAll+" column"+(emptyAll===1?" is":"s are")+" empty on every row.":"");
 }
 bindDrop(document.getElementById("upload-gab"), async files=>{
   const file=files[0]; if(!file) return;

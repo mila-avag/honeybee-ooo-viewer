@@ -157,7 +157,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
       <h3>Task upload</h3>
       <p><b>When.</b> You have a list of task ids and need the upload CSV for them.</p>
       <p><b>Need.</b> A Model pairs count, a Model A and Model B name for each pair, a credential mode (single or dual), and the task ids. The Redash server, unless you use Download query and run the SQL on data source 30. For logins, export <a href="https://docs.google.com/spreadsheets/d/1_TILTW4KthPz1-fysSRlEeV04lYA0m8qznVyz9vCVig/edit?gid=1552775865#gid=1552775865" target="_blank" rel="noopener">the test accounts sheet</a> as a CSV with Accounts and Password columns. If you need more demo accounts, reach out to @kevin chen.</p>
-      <p><b>You get.</b> <code>honeybee_task_upload.csv</code>. The columns stay <code>model_a_name</code> and <code>model_b_name</code>. Choosing 3 pairs writes 3 rows for every task: row 1 is Model A 1 vs Model B 1, row 2 is Model A 2 vs Model B 2, and so on. Language is en_US on every row. Up to 5,000 ids. Demo logins are filled from the accounts file: the two logins on a row are different accounts, and emails are repeated as little as possible. The second login is written to <code>demo_email_b</code> and <code>demo_password_b</code>, and the same login is also written to <code>backup_email</code> and <code>backup_password</code>. Accounts stay in the browser and are written only into the CSV you download.</p>
+      <p><b>You get.</b> <code>honeybee_task_upload.csv</code>. The columns stay <code>model_a_name</code> and <code>model_b_name</code>. Each pair also has a display name, written to <code>model_a_display_name</code> and <code>model_b_display_name</code>. A blank display name stays blank. Choosing 3 pairs writes 3 rows for every task: row 1 is Model A 1 vs Model B 1, row 2 is Model A 2 vs Model B 2, and so on. Language is en_US on every row. Up to 5,000 ids. Demo logins are filled from the accounts file: the two logins on a row are different accounts, and emails are repeated as little as possible. The second login is written to <code>demo_email_b</code> and <code>demo_password_b</code>, and the same login is also written to <code>backup_email</code> and <code>backup_password</code>. Accounts stay in the browser and are written only into the CSV you download.</p>
       <p><b>Prompts made by the customer.</b> Choose that source. The task id box is not shown. Drop the customer task CSV. Build CSV does not call Redash. It writes the same columns. <code>opening_prompt</code> is Turn 1. <code>universe</code> is the persona name. <code>CUJ</code> is the CUJ bench source. File names in the grounding cell become the <code>input_paths</code> JSON list. Seeded account text that is not a file stays in <code>environment_context</code>. <code>target_deliverables</code> and <code>rubric_criteria</code> stay JSON lists, the same shape as a Redash row. A file with no rubric column leaves the rubric empty. Rubric weights are Blocker 3, Rework 2, Polish 1. The rubric category fields (<code>criterion_category</code>, <code>category</code>, <code>subcategory</code>) are null, because the customer file has no category. <code>later_turns</code> is every Turn 2 or later bullet as a JSON list, the same shape as <code>target_deliverables</code>. <code>estimated_turns</code> is the highest turn number in that cell. The page then lists every upload column that is still empty, and how many rows are empty.</p>
       <p>After the rows come back, the page checks each one. A list counts as empty when the cell is blank, <code>null</code>, <code>[]</code>, <code>{}</code>, or a JSON list whose items have no title and no id. A list with one real criterion counts as present.</p>
       <ul class="explain">
@@ -388,7 +388,7 @@ const PROJECT_ID = "6a567b80aaa4d140131eae6c";
 const LOCAL = "http://127.0.0.1:8765";
 // Vercel-hosted helper. Used when the page is on GitHub Pages.
 const HELPER = "https://honeybee-ooo-viewer.vercel.app";
-const UPLOAD_COLS = ["og_task_id","universe","prompt_id","CUJ","task_type","opening_prompt","input_paths","input_uploads","target_deliverables","rubric_criteria","model_a_name","model_b_name","model_c_name","model_d_name","demo_email","demo_password","demo_email_b","demo_password_b","backup_email","backup_password","environment_context","estimated_turns","credential_mode","languageCode"];
+const UPLOAD_COLS = ["og_task_id","universe","prompt_id","CUJ","task_type","opening_prompt","input_paths","input_uploads","target_deliverables","rubric_criteria","model_a_name","model_b_name","model_a_display_name","model_b_display_name","model_c_name","model_d_name","demo_email","demo_password","demo_email_b","demo_password_b","backup_email","backup_password","environment_context","estimated_turns","credential_mode","languageCode"];
 const ID_KEYS = ["task_id","task","TASK","TASK_ID"];
 
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
@@ -877,7 +877,9 @@ function loginNote(n){
 function readPairs(){
   return [...document.querySelectorAll("#upload-pairs .pair")].map(row=>({
     a:row.querySelector(".pair-a").value,
-    b:row.querySelector(".pair-b").value
+    b:row.querySelector(".pair-b").value,
+    aDisplay:row.querySelector(".pair-a-display").value,
+    bDisplay:row.querySelector(".pair-b-display").value
   }));
 }
 function renderUploadPairs(){
@@ -886,23 +888,26 @@ function renderUploadPairs(){
   const host=document.getElementById("upload-pairs");
   host.innerHTML="";
   for(let i=0;i<n;i++){
+    const p=prev[i]||{a:"",b:"",aDisplay:"",bDisplay:""};
     const div=document.createElement("div");
     div.className="row pair";
     div.style.marginTop="8px";
-    div.innerHTML=`<label class="inl">Model A ${i+1} <input type="text" class="pair-a" value="${esc(prev[i]?prev[i].a:"")}" placeholder="Argon Task"></label>`
-      +`<label class="inl">Model B ${i+1} <input type="text" class="pair-b" value="${esc(prev[i]?prev[i].b:"")}" placeholder="Fable 5.1"></label>`;
+    div.innerHTML=`<label class="inl">Model A ${i+1} <input type="text" class="pair-a" value="${esc(p.a)}" placeholder="Argon Task"></label>`
+      +`<label class="inl">A display ${i+1} <input type="text" class="pair-a-display" value="${esc(p.aDisplay)}" placeholder="Argon"></label>`
+      +`<label class="inl">Model B ${i+1} <input type="text" class="pair-b" value="${esc(p.b)}" placeholder="Fable 5.1"></label>`
+      +`<label class="inl">B display ${i+1} <input type="text" class="pair-b-display" value="${esc(p.bDisplay)}" placeholder="Fable"></label>`;
     host.appendChild(div);
   }
 }
 function modelPairs(){
-  return readPairs().map(p=>({a:p.a.trim(), b:p.b.trim()}));
+  return readPairs().map(p=>({a:p.a.trim(), b:p.b.trim(), aDisplay:p.aDisplay.trim(), bDisplay:p.bDisplay.trim()}));
 }
 function stampUpload(rows){
   const pairs=modelPairs();
   const mode=document.getElementById("upload-credential").value;
   const expanded=[];
   for(const r of rows){
-    for(const p of pairs) expanded.push({src:r, a:p.a, b:p.b});
+    for(const p of pairs) expanded.push({src:r, a:p.a, b:p.b, aDisplay:p.aDisplay, bDisplay:p.bDisplay});
   }
   const plan=loginPlan(expanded.length);
   return expanded.map((item,i)=>{
@@ -913,6 +918,8 @@ function stampUpload(rows){
     }
     o.model_a_name=item.a;
     o.model_b_name=item.b;
+    o.model_a_display_name=item.aDisplay;
+    o.model_b_display_name=item.bDisplay;
     o.languageCode="en_US";
     o.credential_mode=mode;
     if(plan){
@@ -984,12 +991,15 @@ function drawUpload(stamped, missing){
   if(broken.length) renderRows(document.getElementById("upload-broken"), ["og_task_id","task_type","missing"], shown);
 }
 function uploadHeaderList(){
-  const headers=uploadHeaders.filter(h=>h!=="model_c_name"&&h!=="model_d_name"&&h!=="backup_email"&&h!=="backup_password");
+  const drop=new Set(["model_c_name","model_d_name","backup_email","backup_password","model_a_display_name","model_b_display_name"]);
+  const headers=uploadHeaders.filter(h=>!drop.has(h));
   for(const h of ["demo_email","demo_password","demo_email_b","demo_password_b","model_a_name","model_b_name","languageCode","credential_mode"]){
     if(!headers.includes(h)) headers.push(h);
   }
-  const after=headers.indexOf("demo_password_b");
-  headers.splice(after<0?headers.length:after+1, 0, "backup_email", "backup_password");
+  const afterLogin=headers.indexOf("demo_password_b");
+  headers.splice(afterLogin<0?headers.length:afterLogin+1, 0, "backup_email", "backup_password");
+  const afterName=headers.indexOf("model_b_name");
+  headers.splice(afterName<0?headers.length:afterName+1, 0, "model_a_display_name", "model_b_display_name");
   return headers;
 }
 bindDrop(document.getElementById("upload-accounts"), async files=>{

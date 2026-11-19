@@ -158,7 +158,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
       <p><b>When.</b> You have a list of task ids and need the upload CSV for them.</p>
       <p><b>Need.</b> A Model pairs count, a Model A and Model B name for each pair, a credential mode (single or dual), and the task ids. The Redash server, unless you use Download query and run the SQL on data source 30. For logins, export <a href="https://docs.google.com/spreadsheets/d/1_TILTW4KthPz1-fysSRlEeV04lYA0m8qznVyz9vCVig/edit?gid=1552775865#gid=1552775865" target="_blank" rel="noopener">the test accounts sheet</a> as a CSV with Accounts and Password columns. If you need more demo accounts, reach out to @kevin chen.</p>
       <p><b>You get.</b> <code>honeybee_task_upload.csv</code>. The columns stay <code>model_a_name</code> and <code>model_b_name</code>. Choosing 3 pairs writes 3 rows for every task: row 1 is Model A 1 vs Model B 1, row 2 is Model A 2 vs Model B 2, and so on. Language is en_US on every row. Up to 5,000 ids. Demo logins are filled from the accounts file: the two logins on a row are different accounts, and emails are repeated as little as possible. Accounts stay in the browser and are written only into the CSV you download.</p>
-      <p><b>Customer file.</b> Drop the customer task CSV instead of pasting ids. Build CSV from customer file does not call Redash. It writes the same columns. <code>opening_prompt</code> is Turn 1. <code>target_deliverables</code> and <code>rubric_criteria</code> stay JSON lists, the same shape as a Redash row. Rubric weights are Blocker 3, Rework 2, Polish 1. The rubric category fields (<code>criterion_category</code>, <code>category</code>, <code>subcategory</code>) are null, because the customer file has no category. <code>later_turns</code> is every Turn 2 or later bullet as a JSON list, the same shape as <code>target_deliverables</code>. <code>estimated_turns</code> is the highest turn number in that cell.</p>
+      <p><b>Customer sheet.</b> Choose Customer sheet. The task id box is not shown. Drop the customer task CSV. Build CSV does not call Redash. It writes the same columns. <code>opening_prompt</code> is Turn 1. <code>target_deliverables</code> and <code>rubric_criteria</code> stay JSON lists, the same shape as a Redash row. Rubric weights are Blocker 3, Rework 2, Polish 1. The rubric category fields (<code>criterion_category</code>, <code>category</code>, <code>subcategory</code>) are null, because the customer file has no category. <code>later_turns</code> is every Turn 2 or later bullet as a JSON list, the same shape as <code>target_deliverables</code>. <code>estimated_turns</code> is the highest turn number in that cell.</p>
       <p>After the rows come back, the page checks each one. A list counts as empty when the cell is blank, <code>null</code>, <code>[]</code>, <code>{}</code>, or a JSON list whose items have no title and no id. A list with one real criterion counts as present.</p>
       <ul class="explain">
         <li>Every task needs a non-blank <code>opening_prompt</code>.</li>
@@ -263,8 +263,13 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
     <h2>Task upload</h2>
     <p style="margin:0 0 8px"><a class="sheet-cta" href="https://docs.google.com/spreadsheets/d/1_TILTW4KthPz1-fysSRlEeV04lYA0m8qznVyz9vCVig/edit?gid=1552775865#gid=1552775865" target="_blank" rel="noopener">📊 Test accounts sheet</a></p>
     <p class="lede" style="margin-top:0">If you need more demo accounts, reach out to @kevin chen.</p>
-    <p class="lede">Build CSV sends the pasted ids to a copy of query 400607 on data source 30. It does not edit the saved query. Build CSV from customer file does not call Redash. Drop the customer CSV, then that button writes the same upload columns from the file. Turn 1 becomes <code>opening_prompt</code>. The outcome and the rubric stay JSON lists. Later turns go in <code>later_turns</code>, a JSON list in the same shape as the outcome. <code>estimated_turns</code> is the highest turn number in that cell. The Model pairs dropdown chooses how many A/B name pairs to write. Pair 1 is Model A 1 and Model B 1, pair 2 is Model A 2 and Model B 2, and so on, up to 10. Each pair becomes its own row for every task. The file still has one <code>model_a_name</code> column and one <code>model_b_name</code> column. The page also writes <code>languageCode</code> as en_US and <code>credential_mode</code> as the word single or dual. That dropdown only writes the word. It does not change how many logins are filled. Download CSV writes the names again from the form, without running Snowflake a second time. Download query saves the SQL with your ids already inside the IN list.</p>
+    <p class="lede">Source chooses which inputs are on the form. Task ids shows the id box, Build CSV, and Download query. Build CSV sends those ids to a copy of query 400607 on data source 30 and does not edit the saved query. Customer sheet hides the id box. Drop the customer CSV, then Build CSV writes the same upload columns from that file and does not call Redash. Turn 1 becomes <code>opening_prompt</code>. The outcome and the rubric stay JSON lists. Later turns go in <code>later_turns</code>, a JSON list in the same shape as the outcome. <code>estimated_turns</code> is the highest turn number in that cell. Both sources use the model pairs, the credential mode, and the accounts file. The Model pairs dropdown chooses how many A/B name pairs to write. Pair 1 is Model A 1 and Model B 1, pair 2 is Model A 2 and Model B 2, and so on, up to 10. Each pair becomes its own row for every task. The file still has one <code>model_a_name</code> column and one <code>model_b_name</code> column. The page also writes <code>languageCode</code> as en_US and <code>credential_mode</code> as the word single or dual. That dropdown only writes the word. It does not change how many logins are filled. Download CSV writes the names again from the form, without running the source a second time. Download query is only on Task ids. It saves the SQL with your ids already inside the IN list.</p>
     <div class="card">
+      <div class="row" style="margin-bottom:10px">
+        <span class="lede" style="margin:0">Source</span>
+        <button type="button" class="b p" id="upload-source-ids">Task ids</button>
+        <button type="button" class="b" id="upload-source-customer">Customer sheet</button>
+      </div>
       <div class="row">
         <label class="inl">Model pairs
           <select id="upload-pair-count">
@@ -288,14 +293,18 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
         </label>
       </div>
       <div id="upload-pairs"></div>
-      <textarea id="upload-ids" placeholder="Paste task ids, one per line or separated by commas"></textarea>
+      <div id="upload-ids-block">
+        <textarea id="upload-ids" placeholder="Paste task ids, one per line or separated by commas"></textarea>
+      </div>
+      <div id="upload-customer-block" hidden>
+        <label class="drop" id="upload-gab" style="margin-top:10px">Drop the customer task CSV here (Task ID, Turn 1, Task Outcome, Finalized Task Rubric), or click to browse<input type="file" accept=".csv,text/csv"></label>
+        <p class="lede" id="upload-gab-status" style="margin:8px 0 0"></p>
+      </div>
       <label class="drop" id="upload-accounts" style="margin-top:10px">Drop the test-accounts CSV here (Accounts, Password), or click to browse<input type="file" accept=".csv"></label>
       <p class="lede" id="upload-accounts-status" style="margin:8px 0 0"></p>
-      <label class="drop" id="upload-gab" style="margin-top:10px">Drop the customer task CSV here (Task ID, Turn 1, Task Outcome, Finalized Task Rubric), or click to browse<input type="file" accept=".csv,text/csv"></label>
-      <p class="lede" id="upload-gab-status" style="margin:8px 0 0"></p>
       <div class="row" style="margin-top:10px">
         <button class="b p" id="upload-go">Build CSV</button>
-        <button class="b" id="upload-gab-go">Build CSV from customer file</button>
+        <button class="b p" id="upload-gab-go" hidden>Build CSV</button>
         <button class="b" id="upload-dl" disabled>Download CSV</button>
         <button class="b" id="upload-sql">Download query</button>
         <span class="lede" id="upload-status" style="margin:0"></span>
@@ -1170,7 +1179,7 @@ bindDrop(document.getElementById("upload-gab"), async files=>{
     const built=await gabRowsFromTable(table);
     if(!built.rows.length) throw new Error("No task rows found in "+file.name+".");
     gabTable={name:file.name, rows:built.rows, notes:built.notes};
-    status.textContent=file.name+" · "+built.rows.length+" tasks. Build CSV from customer file uses these rows and does not call Redash.";
+    status.textContent=file.name+" · "+built.rows.length+" tasks. Build CSV uses these rows and does not call Redash.";
   }catch(e){ gabTable=null; status.textContent=e.message; }
   finally{ setDropText(drop, label); }
 });
@@ -1664,7 +1673,20 @@ document.getElementById("del-pivot-dl").onclick=()=>{
 };
 
 document.getElementById("upload-pair-count").onchange=renderUploadPairs;
+function setUploadSource(source){
+  const customer=source==="customer";
+  document.getElementById("upload-ids-block").hidden=customer;
+  document.getElementById("upload-customer-block").hidden=!customer;
+  document.getElementById("upload-go").hidden=customer;
+  document.getElementById("upload-sql").hidden=customer;
+  document.getElementById("upload-gab-go").hidden=!customer;
+  document.getElementById("upload-source-ids").classList.toggle("p", !customer);
+  document.getElementById("upload-source-customer").classList.toggle("p", customer);
+}
+document.getElementById("upload-source-ids").onclick=()=>setUploadSource("ids");
+document.getElementById("upload-source-customer").onclick=()=>setUploadSource("customer");
 renderUploadPairs();
+setUploadSource("ids");
 detectProxy();
 </script>
 </body>

@@ -159,15 +159,12 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
       <p><b>Need.</b> A Model pairs count, a Model A and Model B name for each pair, a credential mode (single or dual), and the task ids. The Redash server, unless you use Download query and run the SQL on data source 30. For logins, export <a href="https://docs.google.com/spreadsheets/d/1_TILTW4KthPz1-fysSRlEeV04lYA0m8qznVyz9vCVig/edit?gid=1552775865#gid=1552775865" target="_blank" rel="noopener">the test accounts sheet</a> as a CSV with Accounts and Password columns. If you need more demo accounts, reach out to @kevin chen.</p>
       <p><b>You get.</b> <code>honeybee_task_upload.csv</code>. The columns stay <code>model_a_name</code> and <code>model_b_name</code>. Each pair also has a display name, written to <code>model_a_display_name</code> and <code>model_b_display_name</code>. A blank display name stays blank. Choosing 3 pairs writes 3 rows for every task: row 1 is Model A 1 vs Model B 1, row 2 is Model A 2 vs Model B 2, and so on. Language is en_US on every row. Up to 5,000 ids. Demo logins are filled from the accounts file: the two logins on a row are different accounts, and emails are repeated as little as possible. The second login is written to <code>demo_email_b</code> and <code>demo_password_b</code>, and the same login is also written to <code>backup_email</code> and <code>backup_password</code>. Accounts stay in the browser and are written only into the CSV you download.</p>
       <p><b>Prompts made by the customer.</b> Choose that source. The task id box is not shown. Drop the customer task CSV. Build CSV does not call Redash. It writes the same columns. <code>opening_prompt</code> is Turn 1. <code>universe</code> is the persona name. <code>CUJ</code> is the CUJ bench source. File names in the grounding cell become the <code>input_paths</code> JSON list. Seeded account text that is not a file stays in <code>environment_context</code>. <code>target_deliverables</code> and <code>rubric_criteria</code> stay JSON lists, the same shape as a Redash row. A file with no rubric column leaves the rubric empty. Rubric weights are Blocker 3, Rework 2, Polish 1. The rubric category fields (<code>criterion_category</code>, <code>category</code>, <code>subcategory</code>) are null, because the customer file has no category. <code>later_turns</code> is every Turn 2 or later bullet as a JSON list, the same shape as <code>target_deliverables</code>. <code>estimated_turns</code> is the highest turn number in that cell. The page then lists every upload column that is still empty, and how many rows are empty.</p>
-      <p>After the rows come back, the page checks each one. A list counts as empty when the cell is blank, <code>null</code>, <code>[]</code>, <code>{}</code>, or a JSON list whose items have no title and no id. A list with one real criterion counts as present.</p>
+      <p>After the rows are built, each empty cell is either blocking or optional. A list is empty when the cell is blank, <code>null</code>, <code>[]</code>, <code>{}</code>, or a JSON list whose items have no title and no id.</p>
       <ul class="explain">
-        <li>Every task needs a non-blank <code>opening_prompt</code>.</li>
-        <li>Every task needs at least one <code>target_deliverables</code> entry.</li>
-        <li>Every task needs at least one <code>rubric_criteria</code> entry.</li>
-        <li>If <code>task_type</code> contains “aspirational”, <code>universe</code> must be non-blank. Any other task type may have an empty universe.</li>
-        <li><code>environment_context</code> and <code>estimated_turns</code> are allowed to be empty. They are never flagged.</li>
+        <li><b>Blocking.</b> The task is fully broken without it. That is <code>task_type</code>, <code>opening_prompt</code>, at least 10 <code>rubric_criteria</code>, at least 1 <code>target_deliverables</code>, both model names, and <code>demo_email</code> plus <code>demo_password</code>. Prompts made by the customer also need <code>later_turns</code>. <code>demo_email_b</code> and <code>demo_password_b</code> are blocking only when credential mode is dual and the Model B name contains gemini.</li>
+        <li><b>Optional.</b> <code>estimated_turns</code>, <code>og_task_id</code>, <code>prompt_id</code>, the display names, and <code>environment_context</code>. <code>universe</code>, <code>CUJ</code>, <code>input_paths</code>, and <code>input_uploads</code> are used on aspirational tasks and hidden on traffic, and a blank there is still optional.</li>
       </ul>
-      <p>A broken row is still in the CSV. Broken rows are moved to the end, and the page lists the task id, the task type, and the missing fields. Ids that Snowflake did not return are listed separately. They have no row to put in the file. The download is not blocked.</p>
+      <p>Blocking rows stay in the CSV and are moved to the end. The page names the task id and the blocking fields. Ids that Snowflake did not return are listed separately. They have no row to put in the file. The download is not blocked.</p>
       <p>The credential dropdown writes the word <code>single</code> or <code>dual</code> into <code>credential_mode</code>. It does not change how many logins are filled. When an accounts file is loaded, every output row gets two different logins. The second one is also copied into <code>backup_email</code> and <code>backup_password</code>. The assignment looks at the whole file, including every model pair. It gives as many rows as possible a login that appears on no other row. A login used on pair 1 is already spent, so pair 2 of the same task does not count it as unused. Spare logins are the ones that get repeated. Passwords are written only into the CSV you download. They are not sent to Redash.</p>
     </div>
 
@@ -311,13 +308,11 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
       </div>
       <div id="upload-out"></div>
     </div>
-    <div class="note">What gets flagged, after the rows come back. A list is empty when the cell is blank, <code>null</code>, <code>[]</code>, <code>{}</code>, or a JSON list whose items have no title and no id.
+    <div class="note">What gets flagged, after the rows are built. A list is empty when the cell is blank, <code>null</code>, <code>[]</code>, <code>{}</code>, or a JSON list whose items have no title and no id.
       <ul class="explain">
-        <li>Every task needs a non-blank opening prompt, at least one target deliverable, and at least one rubric criterion.</li>
-        <li>If task type contains “aspirational”, universe must be non-blank. Any other task type may have an empty universe.</li>
-        <li>Environment and estimated turns are allowed to be empty. They are never flagged.</li>
-        <li>A customer file is not broken for having fewer than 10 rubric criteria. The page still says how many tasks are under 10, because the upload step asks for at least 10. Those rows stay in the file.</li>
-        <li>Broken rows stay in the file and are moved to the end. The list under the buttons names the task id and the missing fields. Ids Snowflake did not return have no row, so they are listed on their own. The download is not blocked.</li>
+        <li><b>Blocking.</b> The task is fully broken without it: task type, opening prompt, at least 10 rubric criteria, at least 1 target deliverable, both model names, and the Model A login. Customer prompts also need later turns. The Model B login is blocking only when credential mode is dual and the Model B name contains gemini.</li>
+        <li><b>Optional.</b> Estimated turns, task id, prompt id, display names, and environment. Universe, CUJ, and the input lists are used on aspirational tasks and hidden on traffic. A blank there is optional, not blocking.</li>
+        <li>Blocking rows stay in the file and are moved to the end. Ids Snowflake did not return have no row, so they are listed on their own. The download is not blocked.</li>
         <li>With an accounts file, each output row gets two different logins. Uniqueness is counted across the whole file, so a login used on one model pair is not treated as unused on another pair. The page gives as many rows as possible one login that appears nowhere else in the file, and repeats the spare logins to fill the other column. The second login is written to <code>demo_email_b</code>, <code>demo_password_b</code>, <code>backup_email</code>, and <code>backup_password</code>. Passwords are written only into the CSV you download. They are not sent to Redash.</li>
       </ul>
     </div>
@@ -940,14 +935,14 @@ function blankText(v){
   const s=v==null?"":String(v).trim();
   return !s || s.toLowerCase()==="null";
 }
-function filledList(v){
-  if(blankText(v)) return false;
+function listCount(v){
+  if(blankText(v)) return 0;
   const s=String(v).trim();
-  if(s==="[]" || s==="{}") return false;
+  if(s==="[]" || s==="{}") return 0;
   let parsed;
-  try{ parsed=JSON.parse(s); }catch(e){ return true; }
-  if(!Array.isArray(parsed)) return true;
-  return parsed.some(item=>{
+  try{ parsed=JSON.parse(s); }catch(e){ return 1; }
+  if(!Array.isArray(parsed)) return 1;
+  return parsed.filter(item=>{
     if(item==null || item==="") return false;
     if(typeof item==="string") return item.trim()!=="";
     if(typeof item==="object"){
@@ -956,15 +951,53 @@ function filledList(v){
       return title!=="" || id!=="";
     }
     return true;
-  });
+  }).length;
+}
+function filledList(v){ return listCount(v)>0; }
+function modelBNeedsLogin(row){
+  return String(row.credential_mode||"").toLowerCase()==="dual" && /gemini/i.test(row.model_b_name||"");
 }
 function uploadIssues(row){
   const issues=[];
-  if(blankText(row.opening_prompt)) issues.push("opening prompt");
-  if(!filledList(row.target_deliverables)) issues.push("target deliverables");
-  if(!filledList(row.rubric_criteria)) issues.push("rubric");
-  if(/aspirational/i.test(row.task_type||"") && blankText(row.universe)) issues.push("universe");
+  if(blankText(row.task_type)) issues.push("task_type");
+  if(blankText(row.opening_prompt)) issues.push("opening_prompt");
+  const rubrics=listCount(row.rubric_criteria);
+  if(rubrics<10) issues.push(rubrics?("rubric_criteria ("+rubrics+" of 10)"):"rubric_criteria");
+  if(listCount(row.target_deliverables)<1) issues.push("target_deliverables");
+  if(blankText(row.model_a_name)) issues.push("model_a_name");
+  if(blankText(row.model_b_name)) issues.push("model_b_name");
+  if(blankText(row.demo_email)) issues.push("demo_email");
+  if(blankText(row.demo_password)) issues.push("demo_password");
+  if(uploadFromCustomer && listCount(row.later_turns)<1) issues.push("later_turns");
+  if(modelBNeedsLogin(row)){
+    if(blankText(row.demo_email_b)) issues.push("demo_email_b");
+    if(blankText(row.demo_password_b)) issues.push("demo_password_b");
+  }
   return issues;
+}
+function optionalMisses(row){
+  const out=[];
+  const whyB="Required only when credential mode is dual and Model B contains gemini.";
+  if(blankText(row.estimated_turns)) out.push(["estimated_turns","Optional field."]);
+  if(!modelBNeedsLogin(row)){
+    if(blankText(row.demo_email_b)) out.push(["demo_email_b", whyB]);
+    if(blankText(row.demo_password_b)) out.push(["demo_password_b", whyB]);
+  }
+  if(blankText(row.backup_email)) out.push(["backup_email","Copy of the second login. The step reads demo_email_b."]);
+  if(blankText(row.backup_password)) out.push(["backup_password","Copy of the second login. The step reads demo_password_b."]);
+  if(/aspirational/i.test(row.task_type||"")){
+    const whyA="Used on aspirational tasks. Not required.";
+    if(blankText(row.universe)) out.push(["universe", whyA]);
+    if(blankText(row.CUJ)) out.push(["CUJ", whyA]);
+    if(listCount(row.input_paths)<1) out.push(["input_paths", whyA]);
+    if(listCount(row.input_uploads)<1) out.push(["input_uploads", whyA]);
+  }
+  if(blankText(row.environment_context)) out.push(["environment_context","No step text uses it."]);
+  if(blankText(row.og_task_id)) out.push(["og_task_id","Not used."]);
+  if(blankText(row.prompt_id)) out.push(["prompt_id","Not used."]);
+  if(blankText(row.model_a_display_name)) out.push(["model_a_display_name","Not read by a task step."]);
+  if(blankText(row.model_b_display_name)) out.push(["model_b_display_name","Not read by a task step."]);
+  return out;
 }
 function orderUpload(rows){
   const good=[], bad=[];
@@ -972,23 +1005,15 @@ function orderUpload(rows){
   return good.concat(bad);
 }
 function drawUpload(stamped, missing){
-  const broken=[];
-  const seenBreak=new Set();
-  for(const r of stamped){
-    if(!uploadIssues(r).length) continue;
-    const id=(r.og_task_id||"").toLowerCase();
-    if(seenBreak.has(id)) continue;
-    seenBreak.add(id);
-    broken.push(r);
-  }
-  const shown=broken.map(r=>({og_task_id:r.og_task_id||"", task_type:r.task_type||"", missing:uploadIssues(r).join(", ")}));
+  const broken=stamped.filter(r=>uploadIssues(r).length);
+  const shown=broken.map(r=>({og_task_id:r.og_task_id||"", model_b_name:r.model_b_name||"", blocking:uploadIssues(r).join(", ")}));
   document.getElementById("upload-out").innerHTML=
-    `<div class="stats"><div class="stat ok"><b>${stamped.length}</b><span>rows</span></div><div class="stat ${broken.length?"bad":"ok"}"><b>${broken.length}</b><span>broken</span></div><div class="stat ${missing.length?"bad":""}"><b>${missing.length}</b><span>ids not returned</span></div></div>`
+    `<div class="stats"><div class="stat ok"><b>${stamped.length}</b><span>rows</span></div><div class="stat ${broken.length?"bad":"ok"}"><b>${broken.length}</b><span>blocking</span></div><div class="stat ${missing.length?"bad":""}"><b>${missing.length}</b><span>ids not returned</span></div></div>`
     +(missing.length?`<div class="note warn">Not returned: ${esc(missing.join(", "))}</div>`:"")
     +(broken.length
-      ? `<h3 style="margin:14px 0 6px;font-size:15px">Broken tasks</h3><div id="upload-broken"></div>`
-      : `<div class="note">Every task has an opening prompt, target deliverables, and a rubric. Every aspirational task has a universe.</div>`);
-  if(broken.length) renderRows(document.getElementById("upload-broken"), ["og_task_id","task_type","missing"], shown);
+      ? `<h3 style="margin:14px 0 6px;font-size:15px">Blocking</h3><p class="lede" style="margin:0 0 8px">These rows are fully broken. They stay in the CSV and are at the end.</p><div id="upload-broken"></div>`
+      : `<div class="note">Nothing blocking. Every row has a task type, an opening prompt, 10 rubric criteria, a target deliverable, both model names, and a Model A login.</div>`);
+  if(broken.length) renderRows(document.getElementById("upload-broken"), ["og_task_id","model_b_name","blocking"], shown);
 }
 function uploadHeaderList(){
   const drop=new Set(["model_c_name","model_d_name","backup_email","backup_password","model_a_display_name","model_b_display_name"]);
@@ -1202,7 +1227,6 @@ async function gabRowsFromTable(table){
   if(rubricCol && out.some(r=>r.rubric_criteria!=="[]")) notes.push("criterion_category, category, and subcategory are null on every rubric item, because the customer file has no category.");
   notes.push("estimated_turns is the highest turn number in that cell, from 1 to 50.");
   if(!rubricCol) notes.push("This file has no rubric column. rubric_criteria is an empty list. When a Finalized Task Rubric column is added, those lines will be parsed.");
-  if(shortRubric) notes.push(shortRubric+" of "+out.length+" tasks have fewer than 10 rubric criteria. The upload step asks for at least 10. Those rows are still in the file.");
   if(unparsed) notes.push(unparsed+" rubric line"+(unparsed===1?" was":"s were")+" not in the C1 [Blocker] shape and "+(unparsed===1?"was":"were")+" kept with weight 1.");
   if(!grounded) notes.push("No grounding text was written. input_paths and input_uploads are empty lists.");
   return {rows:out, notes:notes.concat(warnings)};
@@ -1212,34 +1236,63 @@ function cellEmpty(v){
   const s=v==null?"":String(v).trim();
   return !s || s.toLowerCase()==="null" || s==="[]" || s==="{}";
 }
-function drawEmptyColumns(rows, headers){
-  const host=document.getElementById("upload-out");
-  const n=rows.length;
-  const shown=headers.map(h=>({column:h, empty:rows.filter(r=>cellEmpty(r[h])).length}))
-    .filter(r=>r.empty>0)
-    .sort((a,b)=>b.empty-a.empty || a.column.localeCompare(b.column))
-    .map(r=>({column:r.column, empty:r.empty===n?"empty on every row":r.empty+" of "+n+" rows"}));
-  if(!shown.length){
-    host.insertAdjacentHTML("beforeend", `<div class="note">No upload column is empty.</div>`);
-    return 0;
+function tallyMisses(rows, pick){
+  const map=new Map();
+  for(const row of rows){
+    for(const [field, why] of pick(row)){
+      if(!map.has(field)) map.set(field, {field, why, n:0});
+      map.get(field).n++;
+    }
   }
-  host.insertAdjacentHTML("beforeend", `<h3 style="margin:14px 0 6px;font-size:15px">Empty columns</h3><p class="lede" style="margin:0 0 8px">A cell counts as empty when it is blank, null, [], or {}. Columns filled from the form, such as the model names, are counted after those are written.</p><div id="upload-empty"></div>`);
-  renderRows(document.getElementById("upload-empty"), ["column","empty"], shown);
-  return shown.filter(r=>r.empty==="empty on every row").length;
+  const n=rows.length;
+  return [...map.values()]
+    .sort((a,b)=>b.n-a.n || a.field.localeCompare(b.field))
+    .map(r=>({column:r.field, rows:r.n===n?"every row":r.n+" of "+n+" rows", why:r.why}));
+}
+function drawEmptyColumns(rows){
+  const host=document.getElementById("upload-out");
+  const blocking=tallyMisses(rows, row=>uploadIssues(row).map(field=>[field.replace(/ \(.*\)$/,""), {
+    task_type:"Decides which steps show. Traffic hides universe, CUJ, input files, and Known/Not Known.",
+    opening_prompt:"Fills the required Opening Prompt field.",
+    rubric_criteria:"Fills Rubric — Pre-Provided, which needs at least 10 criteria.",
+    target_deliverables:"Fills Target Outcome Deliverables, which needs at least 1.",
+    model_a_name:"Used in the titles and text of the visible steps, including overall preference.",
+    model_b_name:"Used in the titles and text of the visible steps, including overall preference.",
+    demo_email:"Shown in the Model A login confirmation step.",
+    demo_password:"Shown in the Model A login confirmation step.",
+    later_turns:"Customer prompts need the later-turn list.",
+    demo_email_b:"Required when credential mode is dual and Model B contains gemini.",
+    demo_password_b:"Required when credential mode is dual and Model B contains gemini."
+  }[field.replace(/ \(.*\)$/,"")]||""]));
+  const optional=tallyMisses(rows, optionalMisses);
+  let html="";
+  if(blocking.length){
+    html+=`<h3 style="margin:14px 0 6px;font-size:15px">Blocking gaps</h3><p class="lede" style="margin:0 0 8px">A row missing any of these is fully broken.</p><div id="upload-blocking-gaps"></div>`;
+  }
+  if(optional.length){
+    html+=`<h3 style="margin:14px 0 6px;font-size:15px">Optional missing</h3><p class="lede" style="margin:0 0 8px">These can be blank. The task still runs.</p><div id="upload-optional-gaps"></div>`;
+  }
+  const traffic=rows.some(r=>/traffic/i.test(r.task_type||"") && !/aspirational/i.test(r.task_type||""));
+  if(traffic) html+=`<div class="note">On traffic tasks, universe, CUJ, input_paths, and input_uploads are not used. Those steps are hidden.</div>`;
+  if(!html) html=`<div class="note">No blocking gaps, and none of the optional fields are empty.</div>`;
+  host.insertAdjacentHTML("beforeend", html);
+  if(blocking.length) renderRows(document.getElementById("upload-blocking-gaps"), ["column","rows","why"], blocking);
+  if(optional.length) renderRows(document.getElementById("upload-optional-gaps"), ["column","rows","why"], optional);
+  return blocking.length;
 }
 function finishUpload(status, sourceLabel){
   const headers=uploadHeaderList();
   const stamped=orderUpload(stampUpload(uploadRows));
-  const broken=new Set(stamped.filter(r=>uploadIssues(r).length).map(r=>(r.og_task_id||"").toLowerCase())).size;
+  const broken=stamped.filter(r=>uploadIssues(r).length).length;
   drawUpload(stamped, uploadMissing);
-  const emptyAll=drawEmptyColumns(stamped, headers);
+  const emptyAll=drawEmptyColumns(stamped);
   if(gabNotes.length){
     document.getElementById("upload-out").insertAdjacentHTML("beforeend", `<div class="note">${gabNotes.map(esc).join("<br>")}</div>`);
   }
   document.getElementById("upload-dl").disabled=false;
   download("honeybee_task_upload.csv", toCSV(headers, stamped));
   const pairs=modelPairs();
-  status.textContent="Downloaded "+stamped.length+" rows ("+uploadRows.length+" tasks × "+pairs.length+" "+(pairs.length===1?"pair":"pairs")+")"+(sourceLabel?". "+sourceLabel:"")+". Language is en_US. Credential mode is "+document.getElementById("upload-credential").value+". "+loginNote(stamped.length)+(broken?" "+broken+" broken "+(broken===1?"task is":"tasks are")+" at the end of the CSV.":" No broken tasks.")+(emptyAll?" "+emptyAll+" column"+(emptyAll===1?" is":"s are")+" empty on every row.":"");
+  status.textContent="Downloaded "+stamped.length+" rows ("+uploadRows.length+" tasks × "+pairs.length+" "+(pairs.length===1?"pair":"pairs")+")"+(sourceLabel?". "+sourceLabel:"")+". Language is en_US. Credential mode is "+document.getElementById("upload-credential").value+". "+loginNote(stamped.length)+(broken?" "+broken+" blocking "+(broken===1?"row is":"rows are")+" at the end of the CSV.":" No blocking rows.")+(emptyAll?" "+emptyAll+" blocking "+(emptyAll===1?"field":"fields")+".":"");
 }
 bindDrop(document.getElementById("upload-gab"), async files=>{
   const file=files[0]; if(!file) return;

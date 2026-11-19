@@ -157,7 +157,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
       <h3>Task upload</h3>
       <p><b>When.</b> You have a list of task ids and need the upload CSV for them.</p>
       <p><b>Need.</b> A Model pairs count, a Model A and Model B name for each pair, a credential mode (single or dual), and the task ids. The Redash server, unless you use Download query and run the SQL on data source 30. For logins, export <a href="https://docs.google.com/spreadsheets/d/1_TILTW4KthPz1-fysSRlEeV04lYA0m8qznVyz9vCVig/edit?gid=1552775865#gid=1552775865" target="_blank" rel="noopener">the test accounts sheet</a> as a CSV with Accounts and Password columns. If you need more demo accounts, reach out to @kevin chen.</p>
-      <p><b>You get.</b> <code>honeybee_task_upload.csv</code>. The columns stay <code>model_a_name</code> and <code>model_b_name</code>. Choosing 3 pairs writes 3 rows for every task: row 1 is Model A 1 vs Model B 1, row 2 is Model A 2 vs Model B 2, and so on. Language is en_US on every row. Up to 5,000 ids. Demo logins are filled from the accounts file: the two logins on a row are different accounts, and emails are repeated as little as possible. Accounts stay in the browser and are written only into the CSV you download.</p>
+      <p><b>You get.</b> <code>honeybee_task_upload.csv</code>. The columns stay <code>model_a_name</code> and <code>model_b_name</code>. Choosing 3 pairs writes 3 rows for every task: row 1 is Model A 1 vs Model B 1, row 2 is Model A 2 vs Model B 2, and so on. Language is en_US on every row. Up to 5,000 ids. Demo logins are filled from the accounts file: the two logins on a row are different accounts, and emails are repeated as little as possible. The second login is written to <code>demo_email_b</code> and <code>demo_password_b</code>, and the same login is also written to <code>backup_email</code> and <code>backup_password</code>. Accounts stay in the browser and are written only into the CSV you download.</p>
       <p><b>Prompts made by the customer.</b> Choose that source. The task id box is not shown. Drop the customer task CSV. Build CSV does not call Redash. It writes the same columns. <code>opening_prompt</code> is Turn 1. <code>universe</code> is the persona name. <code>CUJ</code> is the CUJ bench source. File names in the grounding cell become the <code>input_paths</code> JSON list. Seeded account text that is not a file stays in <code>environment_context</code>. <code>target_deliverables</code> and <code>rubric_criteria</code> stay JSON lists, the same shape as a Redash row. A file with no rubric column leaves the rubric empty. Rubric weights are Blocker 3, Rework 2, Polish 1. The rubric category fields (<code>criterion_category</code>, <code>category</code>, <code>subcategory</code>) are null, because the customer file has no category. <code>later_turns</code> is every Turn 2 or later bullet as a JSON list, the same shape as <code>target_deliverables</code>. <code>estimated_turns</code> is the highest turn number in that cell. The page then lists every upload column that is still empty, and how many rows are empty.</p>
       <p>After the rows come back, the page checks each one. A list counts as empty when the cell is blank, <code>null</code>, <code>[]</code>, <code>{}</code>, or a JSON list whose items have no title and no id. A list with one real criterion counts as present.</p>
       <ul class="explain">
@@ -168,7 +168,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
         <li><code>environment_context</code> and <code>estimated_turns</code> are allowed to be empty. They are never flagged.</li>
       </ul>
       <p>A broken row is still in the CSV. Broken rows are moved to the end, and the page lists the task id, the task type, and the missing fields. Ids that Snowflake did not return are listed separately. They have no row to put in the file. The download is not blocked.</p>
-      <p>The credential dropdown writes the word <code>single</code> or <code>dual</code> into <code>credential_mode</code>. It does not change how many logins are filled. When an accounts file is loaded, every output row gets two different logins. The assignment looks at the whole file, including every model pair. It gives as many rows as possible a login that appears on no other row. A login used on pair 1 is already spent, so pair 2 of the same task does not count it as unused. Spare logins are the ones that get repeated. Passwords are written only into the CSV you download. They are not sent to Redash.</p>
+      <p>The credential dropdown writes the word <code>single</code> or <code>dual</code> into <code>credential_mode</code>. It does not change how many logins are filled. When an accounts file is loaded, every output row gets two different logins. The second one is also copied into <code>backup_email</code> and <code>backup_password</code>. The assignment looks at the whole file, including every model pair. It gives as many rows as possible a login that appears on no other row. A login used on pair 1 is already spent, so pair 2 of the same task does not count it as unused. Spare logins are the ones that get repeated. Passwords are written only into the CSV you download. They are not sent to Redash.</p>
     </div>
 
     <div class="card">
@@ -318,7 +318,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
         <li>Environment and estimated turns are allowed to be empty. They are never flagged.</li>
         <li>A customer file is not broken for having fewer than 10 rubric criteria. The page still says how many tasks are under 10, because the upload step asks for at least 10. Those rows stay in the file.</li>
         <li>Broken rows stay in the file and are moved to the end. The list under the buttons names the task id and the missing fields. Ids Snowflake did not return have no row, so they are listed on their own. The download is not blocked.</li>
-        <li>With an accounts file, each output row gets two different logins. Uniqueness is counted across the whole file, so a login used on one model pair is not treated as unused on another pair. The page gives as many rows as possible one login that appears nowhere else in the file, and repeats the spare logins to fill the other column. Passwords are written only into the CSV you download. They are not sent to Redash.</li>
+        <li>With an accounts file, each output row gets two different logins. Uniqueness is counted across the whole file, so a login used on one model pair is not treated as unused on another pair. The page gives as many rows as possible one login that appears nowhere else in the file, and repeats the spare logins to fill the other column. The second login is written to <code>demo_email_b</code>, <code>demo_password_b</code>, <code>backup_email</code>, and <code>backup_password</code>. Passwords are written only into the CSV you download. They are not sent to Redash.</li>
       </ul>
     </div>
   </section>
@@ -388,7 +388,7 @@ const PROJECT_ID = "6a567b80aaa4d140131eae6c";
 const LOCAL = "http://127.0.0.1:8765";
 // Vercel-hosted helper. Used when the page is on GitHub Pages.
 const HELPER = "https://honeybee-ooo-viewer.vercel.app";
-const UPLOAD_COLS = ["og_task_id","universe","prompt_id","CUJ","task_type","opening_prompt","input_paths","input_uploads","target_deliverables","rubric_criteria","model_a_name","model_b_name","model_c_name","model_d_name","demo_email","demo_password","demo_email_b","demo_password_b","environment_context","estimated_turns","credential_mode","languageCode"];
+const UPLOAD_COLS = ["og_task_id","universe","prompt_id","CUJ","task_type","opening_prompt","input_paths","input_uploads","target_deliverables","rubric_criteria","model_a_name","model_b_name","model_c_name","model_d_name","demo_email","demo_password","demo_email_b","demo_password_b","backup_email","backup_password","environment_context","estimated_turns","credential_mode","languageCode"];
 const ID_KEYS = ["task_id","task","TASK","TASK_ID"];
 
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
@@ -920,6 +920,11 @@ function stampUpload(rows){
       o.demo_password=plan.pairs[i][0].password;
       o.demo_email_b=plan.pairs[i][1].email;
       o.demo_password_b=plan.pairs[i][1].password;
+      o.backup_email=plan.pairs[i][1].email;
+      o.backup_password=plan.pairs[i][1].password;
+    }else{
+      o.backup_email="";
+      o.backup_password="";
     }
     return o;
   });
@@ -979,10 +984,12 @@ function drawUpload(stamped, missing){
   if(broken.length) renderRows(document.getElementById("upload-broken"), ["og_task_id","task_type","missing"], shown);
 }
 function uploadHeaderList(){
-  const headers=uploadHeaders.filter(h=>h!=="model_c_name"&&h!=="model_d_name");
+  const headers=uploadHeaders.filter(h=>h!=="model_c_name"&&h!=="model_d_name"&&h!=="backup_email"&&h!=="backup_password");
   for(const h of ["demo_email","demo_password","demo_email_b","demo_password_b","model_a_name","model_b_name","languageCode","credential_mode"]){
     if(!headers.includes(h)) headers.push(h);
   }
+  const after=headers.indexOf("demo_password_b");
+  headers.splice(after<0?headers.length:after+1, 0, "backup_email", "backup_password");
   return headers;
 }
 bindDrop(document.getElementById("upload-accounts"), async files=>{

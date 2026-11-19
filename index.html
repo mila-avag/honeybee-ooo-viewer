@@ -158,7 +158,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
       <p><b>When.</b> You have a list of task ids and need the upload CSV for them.</p>
       <p><b>Need.</b> A Model pairs count, a Model A and Model B name for each pair, a credential mode (single or dual), and the task ids. The Redash server, unless you use Download query and run the SQL on data source 30. For logins, export <a href="https://docs.google.com/spreadsheets/d/1_TILTW4KthPz1-fysSRlEeV04lYA0m8qznVyz9vCVig/edit?gid=1552775865#gid=1552775865" target="_blank" rel="noopener">the test accounts sheet</a> as a CSV with Accounts and Password columns. If you need more demo accounts, reach out to @kevin chen.</p>
       <p><b>You get.</b> <code>honeybee_task_upload.csv</code>. The columns stay <code>model_a_name</code> and <code>model_b_name</code>. Choosing 3 pairs writes 3 rows for every task: row 1 is Model A 1 vs Model B 1, row 2 is Model A 2 vs Model B 2, and so on. Language is en_US on every row. Up to 5,000 ids. Demo logins are filled from the accounts file: the two logins on a row are different accounts, and emails are repeated as little as possible. Accounts stay in the browser and are written only into the CSV you download.</p>
-      <p><b>Customer file.</b> Drop the customer task CSV instead of pasting ids. Build CSV from customer file does not call Redash. It writes the same columns. <code>opening_prompt</code> is Turn 1. <code>target_deliverables</code> and <code>rubric_criteria</code> stay JSON lists, the same shape as a Redash row. Rubric weights are Blocker 3, Rework 2, Polish 1. Later turns are not a column in this file, so they are not written. <code>estimated_turns</code> is the highest turn number in that cell.</p>
+      <p><b>Customer file.</b> Drop the customer task CSV instead of pasting ids. Build CSV from customer file does not call Redash. It writes the same columns. <code>opening_prompt</code> is Turn 1. <code>target_deliverables</code> and <code>rubric_criteria</code> stay JSON lists, the same shape as a Redash row. Rubric weights are Blocker 3, Rework 2, Polish 1. The rubric category fields (<code>criterion_category</code>, <code>category</code>, <code>subcategory</code>) are null, because the customer file has no category. <code>later_turns</code> is every Turn 2 or later bullet as a JSON list, the same shape as <code>target_deliverables</code>. <code>estimated_turns</code> is the highest turn number in that cell.</p>
       <p>After the rows come back, the page checks each one. A list counts as empty when the cell is blank, <code>null</code>, <code>[]</code>, <code>{}</code>, or a JSON list whose items have no title and no id. A list with one real criterion counts as present.</p>
       <ul class="explain">
         <li>Every task needs a non-blank <code>opening_prompt</code>.</li>
@@ -263,7 +263,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
     <h2>Task upload</h2>
     <p style="margin:0 0 8px"><a class="sheet-cta" href="https://docs.google.com/spreadsheets/d/1_TILTW4KthPz1-fysSRlEeV04lYA0m8qznVyz9vCVig/edit?gid=1552775865#gid=1552775865" target="_blank" rel="noopener">📊 Test accounts sheet</a></p>
     <p class="lede" style="margin-top:0">If you need more demo accounts, reach out to @kevin chen.</p>
-    <p class="lede">Build CSV sends the pasted ids to a copy of query 400607 on data source 30. It does not edit the saved query. Build CSV from customer file does not call Redash. Drop the customer CSV, then that button writes the same upload columns from the file. Turn 1 becomes <code>opening_prompt</code>. The outcome and the rubric stay JSON lists. Later turns are not written, because this file has no column for them. <code>estimated_turns</code> is the highest turn number in that cell. The Model pairs dropdown chooses how many A/B name pairs to write. Pair 1 is Model A 1 and Model B 1, pair 2 is Model A 2 and Model B 2, and so on, up to 10. Each pair becomes its own row for every task. The file still has one <code>model_a_name</code> column and one <code>model_b_name</code> column. The page also writes <code>languageCode</code> as en_US and <code>credential_mode</code> as the word single or dual. That dropdown only writes the word. It does not change how many logins are filled. Download CSV writes the names again from the form, without running Snowflake a second time. Download query saves the SQL with your ids already inside the IN list.</p>
+    <p class="lede">Build CSV sends the pasted ids to a copy of query 400607 on data source 30. It does not edit the saved query. Build CSV from customer file does not call Redash. Drop the customer CSV, then that button writes the same upload columns from the file. Turn 1 becomes <code>opening_prompt</code>. The outcome and the rubric stay JSON lists. Later turns go in <code>later_turns</code>, a JSON list in the same shape as the outcome. <code>estimated_turns</code> is the highest turn number in that cell. The Model pairs dropdown chooses how many A/B name pairs to write. Pair 1 is Model A 1 and Model B 1, pair 2 is Model A 2 and Model B 2, and so on, up to 10. Each pair becomes its own row for every task. The file still has one <code>model_a_name</code> column and one <code>model_b_name</code> column. The page also writes <code>languageCode</code> as en_US and <code>credential_mode</code> as the word single or dual. That dropdown only writes the word. It does not change how many logins are filled. Download CSV writes the names again from the form, without running Snowflake a second time. Download query saves the SQL with your ids already inside the IN list.</p>
     <div class="card">
       <div class="row">
         <label class="inl">Model pairs
@@ -1093,7 +1093,7 @@ async function gabRowsFromTable(table){
     for(let i=0;i<bullets.length;i++){
       const line=gabTitle(bullets[i]);
       const match=rubricRe.exec(line);
-      const item={criterion_id:await gabUuid5(taskId+"|rubric|"+i), title:line, weight:1};
+      const item={criterion_id:await gabUuid5(taskId+"|rubric|"+i), title:line, weight:1, criterion_category:null, category:null, subcategory:null};
       if(!match){
         unparsed++;
         if(unparsed<=5) warnings.push(taskId+": rubric line kept with weight 1: "+line.slice(0,80));
@@ -1107,6 +1107,11 @@ async function gabRowsFromTable(table){
     const outcomes=gabBullets(cell(src, outcomeCol));
     for(let i=0;i<outcomes.length;i++){
       deliverables.push({criterion_id:await gabUuid5(taskId+"|deliverable|"+i), title:gabTitle(outcomes[i])});
+    }
+    const later=[];
+    const laterBullets=gabBullets(laterCol?cell(src, laterCol):"");
+    for(let i=0;i<laterBullets.length;i++){
+      later.push({criterion_id:await gabUuid5(taskId+"|later|"+i), title:gabTitle(laterBullets[i])});
     }
     if(rubric.length<10) shortRubric++;
     const ground=groundCol?cell(src, groundCol):"";
@@ -1124,12 +1129,15 @@ async function gabRowsFromTable(table){
     row.rubric_criteria=JSON.stringify(rubric);
     row.environment_context=environment;
     row.estimated_turns=laterCol?gabTurns(cell(src, laterCol)):"";
+    row.later_turns=JSON.stringify(later);
     row.languageCode="en_US";
     out.push(row);
   }
   const notes=[];
   if(skipped) notes.push("Skipped "+skipped+" note or blank row"+(skipped===1?"":"s")+".");
-  notes.push("Later turns are not a column in the upload file, so they are not written. estimated_turns is the highest turn number in that cell, from 1 to 50.");
+  notes.push("later_turns is every Turn 2 or later bullet as a JSON list of criterion_id and title, the same shape as target_deliverables. It is a new column, so the Redash upload query does not have it.");
+  notes.push("criterion_category, category, and subcategory are null on every rubric item, because the customer file has no category.");
+  notes.push("estimated_turns is the highest turn number in that cell, from 1 to 50.");
   if(shortRubric) notes.push(shortRubric+" of "+out.length+" tasks have fewer than 10 rubric criteria. The upload step asks for at least 10. Those rows are still in the file.");
   if(unparsed) notes.push(unparsed+" rubric line"+(unparsed===1?" was":"s were")+" not in the C1 [Blocker] shape and "+(unparsed===1?"was":"were")+" kept with weight 1.");
   if(grounded) notes.push(grounded+" task"+(grounded===1?" has":"s have")+" grounding text in environment_context. This file's input lists stay empty.");
@@ -1173,7 +1181,7 @@ document.getElementById("upload-gab-go").onclick=()=>{
     if(!pairs.length || pairs.some(p=>!p.a||!p.b)){ status.textContent="Enter a Model A name and a Model B name for every pair."; return; }
     if(!gabTable){ status.textContent="Drop the customer task CSV first."; return; }
     uploadFromCustomer=true;
-    uploadHeaders=UPLOAD_COLS.slice();
+    uploadHeaders=UPLOAD_COLS.concat(["later_turns"]);
     uploadRows=gabTable.rows;
     uploadMissing=[];
     gabNotes=gabTable.notes;

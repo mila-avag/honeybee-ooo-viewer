@@ -157,7 +157,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
       <h3>Task upload</h3>
       <p><b>When.</b> You have a list of task ids and need the upload CSV for them.</p>
       <p><b>Need.</b> A Model pairs count, a Model A and Model B name for each pair, a credential mode (single or dual), and the task ids. The Redash server, unless you use Download query and run the SQL on data source 30. For logins, export <a href="https://docs.google.com/spreadsheets/d/1_TILTW4KthPz1-fysSRlEeV04lYA0m8qznVyz9vCVig/edit?gid=1552775865#gid=1552775865" target="_blank" rel="noopener">the test accounts sheet</a> as a CSV with Accounts and Password columns. If you need more demo accounts, reach out to @kevin chen.</p>
-      <p><b>You get.</b> <code>honeybee_task_upload.csv</code>. The columns stay <code>model_a_name</code> and <code>model_b_name</code>. Each pair also has a display name, written to <code>model_a_display_name</code> and <code>model_b_display_name</code>. A blank display name stays blank. Choosing 3 pairs writes 3 rows for every task: row 1 is Model A 1 vs Model B 1, row 2 is Model A 2 vs Model B 2, and so on. Language is en_US on every row. Up to 5,000 ids. Demo logins are filled from the accounts file: the two logins on a row are different accounts, and emails are repeated as little as possible. The second login is written to <code>demo_email_b</code> and <code>demo_password_b</code>, and the same login is also written to <code>backup_email</code> and <code>backup_password</code>. Accounts stay in the browser and are written only into the CSV you download.</p>
+      <p><b>You get.</b> <code>honeybee_task_upload.csv</code>. The columns stay <code>model_a_name</code> and <code>model_b_name</code>. Each pair also has a display name, written to <code>model_a_display_name</code> and <code>model_b_display_name</code>. A blank display name stays blank. Flow type is written to <code>flow_type</code> on every row. A blank flow type stays blank. Choosing 3 pairs writes 3 rows for every task: row 1 is Model A 1 vs Model B 1, row 2 is Model A 2 vs Model B 2, and so on. Language is en_US on every row. Up to 5,000 ids. Demo logins are filled from the accounts file: the two logins on a row are different accounts, and emails are repeated as little as possible. The second login is written to <code>demo_email_b</code> and <code>demo_password_b</code>, and the same login is also written to <code>backup_email</code> and <code>backup_password</code>. Accounts stay in the browser and are written only into the CSV you download.</p>
       <p><b>Prompts made by the customer.</b> Choose that source. The task id box is not shown. Drop the customer task CSV. Build CSV does not call Redash. It writes the same columns. <code>opening_prompt</code> is Turn 1. <code>universe</code> is the persona name. <code>CUJ</code> is the CUJ bench source. File names in the grounding cell become the <code>input_paths</code> JSON list. Seeded account text that is not a file stays in <code>environment_context</code>. <code>target_deliverables</code> and <code>rubric_criteria</code> stay JSON lists, the same shape as a Redash row. A file with no rubric column leaves the rubric empty. Rubric weights are Blocker 3, Rework 2, Polish 1. The rubric category fields (<code>criterion_category</code>, <code>category</code>, <code>subcategory</code>) are null, because the customer file has no category. <code>later_turns</code> is every Turn 2 or later bullet as a JSON list, the same shape as <code>target_deliverables</code>. <code>estimated_turns</code> is the highest turn number in that cell. The page then lists every upload column that is still empty, and how many rows are empty.</p>
       <p>After the rows are built, each empty cell is either blocking or optional. A list is empty when the cell is blank, <code>null</code>, <code>[]</code>, <code>{}</code>, or a JSON list whose items have no title and no id.</p>
       <ul class="explain">
@@ -288,6 +288,9 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
             <option value="dual">dual</option>
           </select>
         </label>
+        <label class="inl">Flow type
+          <input type="text" id="upload-flow" placeholder="flow type">
+        </label>
       </div>
       <div id="upload-pairs"></div>
       <div id="upload-ids-block">
@@ -383,7 +386,7 @@ const PROJECT_ID = "6a567b80aaa4d140131eae6c";
 const LOCAL = "http://127.0.0.1:8765";
 // Vercel-hosted helper. Used when the page is on GitHub Pages.
 const HELPER = "https://honeybee-ooo-viewer.vercel.app";
-const UPLOAD_COLS = ["og_task_id","universe","prompt_id","CUJ","task_type","opening_prompt","input_paths","input_uploads","target_deliverables","rubric_criteria","model_a_name","model_b_name","model_a_display_name","model_b_display_name","model_c_name","model_d_name","demo_email","demo_password","demo_email_b","demo_password_b","backup_email","backup_password","environment_context","estimated_turns","credential_mode","languageCode"];
+const UPLOAD_COLS = ["og_task_id","universe","prompt_id","CUJ","task_type","flow_type","opening_prompt","input_paths","input_uploads","target_deliverables","rubric_criteria","model_a_name","model_b_name","model_a_display_name","model_b_display_name","model_c_name","model_d_name","demo_email","demo_password","demo_email_b","demo_password_b","backup_email","backup_password","environment_context","estimated_turns","credential_mode","languageCode"];
 const ID_KEYS = ["task_id","task","TASK","TASK_ID"];
 
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
@@ -917,6 +920,7 @@ function stampUpload(rows){
     o.model_b_display_name=item.bDisplay;
     o.languageCode="en_US";
     o.credential_mode=mode;
+    o.flow_type=(document.getElementById("upload-flow").value||"").trim();
     if(plan){
       o.demo_email=plan.pairs[i][0].email;
       o.demo_password=plan.pairs[i][0].password;
@@ -997,6 +1001,7 @@ function optionalMisses(row){
   if(blankText(row.prompt_id)) out.push(["prompt_id","Not used."]);
   if(blankText(row.model_a_display_name)) out.push(["model_a_display_name","Not read by a task step."]);
   if(blankText(row.model_b_display_name)) out.push(["model_b_display_name","Not read by a task step."]);
+  if(blankText(row.flow_type)) out.push(["flow_type","Written from the Flow type field."]);
   return out;
 }
 function orderUpload(rows){
@@ -1016,7 +1021,7 @@ function drawUpload(stamped, missing){
   if(broken.length) renderRows(document.getElementById("upload-broken"), ["og_task_id","model_b_name","blocking"], shown);
 }
 function uploadHeaderList(){
-  const drop=new Set(["model_c_name","model_d_name","backup_email","backup_password","model_a_display_name","model_b_display_name"]);
+  const drop=new Set(["model_c_name","model_d_name","backup_email","backup_password","model_a_display_name","model_b_display_name","flow_type"]);
   const headers=uploadHeaders.filter(h=>!drop.has(h));
   for(const h of ["demo_email","demo_password","demo_email_b","demo_password_b","model_a_name","model_b_name","languageCode","credential_mode"]){
     if(!headers.includes(h)) headers.push(h);
@@ -1025,6 +1030,8 @@ function uploadHeaderList(){
   headers.splice(afterLogin<0?headers.length:afterLogin+1, 0, "backup_email", "backup_password");
   const afterName=headers.indexOf("model_b_name");
   headers.splice(afterName<0?headers.length:afterName+1, 0, "model_a_display_name", "model_b_display_name");
+  const afterType=headers.indexOf("task_type");
+  headers.splice(afterType<0?headers.length:afterType+1, 0, "flow_type");
   return headers;
 }
 bindDrop(document.getElementById("upload-accounts"), async files=>{

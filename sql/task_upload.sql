@@ -2,8 +2,60 @@
 -- The IN list is filled in when you download this file from the viewer after pasting task ids.
 -- Honeybee task authoring fields. Resolves CDS pointer so response.before is readable.
 -- Every field: use response value if present/non-empty, else fall back to metadata.
+-- Live PUBLIC.TASKS is used first. Ids that are only in the deleted-tasks history are still returned.
 
-WITH resolved AS (
+WITH task_rows AS (
+  SELECT
+    t._id,
+    t.metadata,
+    0 AS src_pref,
+    NULL AS dump_time
+  FROM PUBLIC.TASKS t
+  WHERE t._id IN ({{task_ids}})
+  UNION ALL
+  SELECT
+    t._id,
+    t.metadata,
+    1 AS src_pref,
+    t.__dump_time AS dump_time
+  FROM PUBLIC_W_DELETED.TASKS t
+  WHERE t._id IN ({{task_ids}})
+),
+
+tasks AS (
+  SELECT _id, metadata
+  FROM task_rows
+  QUALIFY ROW_NUMBER() OVER (
+    PARTITION BY _id
+    ORDER BY src_pref ASC, dump_time DESC NULLS LAST
+  ) = 1
+),
+
+attempt_rows AS (
+  SELECT
+    ta.task,
+    ta.response,
+    ta.attempt_version,
+    ta.attempted_at,
+    0 AS src_pref,
+    FALSE AS is_deleted,
+    NULL AS dump_time
+  FROM PUBLIC.TASKATTEMPTS ta
+  WHERE ta.task IN ({{task_ids}})
+  UNION ALL
+  SELECT
+    ta.task,
+    ta.response,
+    ta.attempt_version,
+    ta.attempted_at,
+    1 AS src_pref,
+    COALESCE(ta.__deleted, FALSE) AS is_deleted,
+    ta.__dump_time AS dump_time
+  FROM PUBLIC_W_DELETED.TASKATTEMPTS ta
+  WHERE ta.task IN ({{task_ids}})
+),
+
+resolved AS (
   SELECT
     t._id       AS og_task_id,
     t.metadata  AS metadata,
@@ -11,16 +63,20 @@ WITH resolved AS (
       TRY_PARSE_JSON(COALESCE(cds.s3_content, ta.response)::string),
       COALESCE(cds.s3_content, ta.response)
     )           AS response
-  FROM PUBLIC.TASKS t
-  LEFT JOIN PUBLIC.TASKATTEMPTS ta
+  FROM tasks t
+  LEFT JOIN attempt_rows ta
     ON ta.task = t._id
   LEFT JOIN ETL.CDS_S3 cds
     ON ta.response:type::string = 'ResponseObject'
    AND cds.cds_url = ta.response:url::string
-  WHERE t._id IN ({{task_ids}})
   QUALIFY ROW_NUMBER() OVER (
     PARTITION BY t._id
-    ORDER BY ta.attempt_version DESC NULLS LAST, ta.attempted_at DESC NULLS LAST
+    ORDER BY
+      ta.src_pref ASC,
+      IFF(ta.is_deleted, 1, 0) ASC,
+      ta.attempt_version DESC NULLS LAST,
+      ta.attempted_at DESC NULLS LAST,
+      ta.dump_time DESC NULLS LAST
   ) = 1
 ),
 

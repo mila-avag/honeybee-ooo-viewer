@@ -161,7 +161,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
       <p><b>Prompts made by the customer.</b> Choose that source. The task id box is not shown. Drop the customer task CSV. Build CSV does not call Redash. It writes the same columns. <code>opening_prompt</code> is Turn 1. <code>universe</code> is the persona name. <code>CUJ</code> is the CUJ bench source. File names in the grounding cell become the <code>input_paths</code> JSON list. Seeded account text that is not a file stays in <code>environment_context</code>. <code>target_deliverables</code> and <code>rubric_criteria</code> stay JSON lists, the same shape as a Redash row. A file with no rubric column leaves the rubric empty. Rubric weights are Blocker 3, Rework 2, Polish 1. The rubric category fields (<code>criterion_category</code>, <code>category</code>, <code>subcategory</code>) are empty strings, because the customer file has no category. A column whose name starts with Rubric is read, including Rubric (mark each line Met or Not met). <code>later_turns</code> is the later-turn bullets on one line. <code>taskId</code> is left blank for a customer file. The platform fills it when the task is created. <code>og_task_id</code> stays the customer task id. <code>estimated_turns</code> is the highest turn number in that cell. The page then lists every upload column that is still empty, and how many rows are empty.</p>
       <p>After the rows are built, each empty cell is either blocking or optional. A list is empty when the cell is blank, <code>null</code>, <code>[]</code>, <code>{}</code>, or a JSON list whose items have no title and no id.</p>
       <ul class="explain">
-        <li><b>Blocking.</b> The task is fully broken without it. That is <code>task_type</code>, <code>opening_prompt</code>, at least 10 <code>rubric_criteria</code>, at least 1 <code>target_deliverables</code>, both model names, and <code>demo_email</code> plus <code>demo_password</code>. Prompts made by the customer also need <code>later_turns</code>. <code>demo_email_b</code> and <code>demo_password_b</code> are blocking only when credential mode is dual and the Model B name contains gemini.</li>
+        <li><b>Blocking.</b> The task is fully broken without it. That is <code>task_type</code>, <code>opening_prompt</code>, at least 10 <code>rubric_criteria</code> on Prompt made by us (not checked for customer prompts), at least 1 <code>target_deliverables</code>, both model names, and <code>demo_email</code> plus <code>demo_password</code>. Prompts made by the customer also need <code>later_turns</code>. <code>demo_email_b</code> and <code>demo_password_b</code> are blocking only when credential mode is dual and the Model B name contains gemini.</li>
         <li><b>Optional.</b> <code>estimated_turns</code>, <code>taskId</code> on a customer file, <code>og_task_id</code>, the display names, <code>flow_type</code>, and <code>environment_context</code>. <code>universe</code>, <code>CUJ</code>, <code>input_paths</code>, and <code>input_uploads</code> are used on aspirational tasks and hidden on traffic, and a blank there is still optional. The second login is also copied to <code>back_up_email</code> and <code>back_up_password</code>.</li>
       </ul>
       <p>Blocking rows stay in the CSV and are moved to the end. The page names the task id and the blocking fields. Ids that Snowflake did not return are listed separately. They have no row to put in the file. The download is not blocked.</p>
@@ -313,7 +313,7 @@ footer{color:var(--soft);text-align:center;font-size:12px;padding:8px 16px 24px}
     </div>
     <div class="note">What gets flagged, after the rows are built. A list is empty when the cell is blank, <code>null</code>, <code>[]</code>, <code>{}</code>, or a JSON list whose items have no title and no id.
       <ul class="explain">
-        <li><b>Blocking.</b> The task is fully broken without it: task type, opening prompt, at least 10 rubric criteria, at least 1 target deliverable, both model names, and the Model A login. Customer prompts also need later turns. The Model B login is blocking only when credential mode is dual and the Model B name contains gemini.</li>
+        <li><b>Blocking.</b> The task is fully broken without it: task type, opening prompt, at least 1 target deliverable, both model names, and the Model A login. On Prompt made by us, it also needs at least 10 rubric criteria. The rubric is not checked for customer prompts. Customer prompts also need later turns. The Model B login is blocking only when credential mode is dual and the Model B name contains gemini.</li>
         <li><b>Optional.</b> Estimated turns, a blank taskId on a customer file, display names, flow type, and environment. Universe, CUJ, and the input lists are used on aspirational tasks and hidden on traffic. A blank there is optional, not blocking.</li>
         <li>Blocking rows stay in the file and are moved to the end. Ids Snowflake did not return have no row, so they are listed on their own. The download is not blocked.</li>
         <li>With an accounts file, each output row gets two different logins. Uniqueness is counted across the whole file, so a login used on one model pair is not treated as unused on another pair. The page gives as many rows as possible one login that appears nowhere else in the file, and repeats the spare logins to fill the other column. The second login is written to <code>demo_email_b</code>, <code>demo_password_b</code>, <code>back_up_email</code>, and <code>back_up_password</code>. Passwords are written only into the CSV you download. They are not sent to Redash.</li>
@@ -966,8 +966,10 @@ function uploadIssues(row){
   const issues=[];
   if(blankText(row.task_type)) issues.push("task_type");
   if(blankText(row.opening_prompt)) issues.push("opening_prompt");
-  const rubrics=listCount(row.rubric_criteria);
-  if(rubrics<10) issues.push(rubrics?("rubric_criteria ("+rubrics+" of 10)"):"rubric_criteria");
+  if(!uploadFromCustomer){
+    const rubrics=listCount(row.rubric_criteria);
+    if(rubrics<10) issues.push(rubrics?("rubric_criteria ("+rubrics+" of 10)"):"rubric_criteria");
+  }
   if(listCount(row.target_deliverables)<1) issues.push("target_deliverables");
   if(blankText(row.model_a_name)) issues.push("model_a_name");
   if(blankText(row.model_b_name)) issues.push("model_b_name");
@@ -1018,7 +1020,7 @@ function drawUpload(stamped, missing){
     +(missing.length?`<div class="note warn">Not returned: ${esc(missing.join(", "))}</div>`:"")
     +(broken.length
       ? `<h3 style="margin:14px 0 6px;font-size:15px">Blocking</h3><p class="lede" style="margin:0 0 8px">These rows are fully broken. They stay in the CSV and are at the end.</p><div id="upload-broken"></div>`
-      : `<div class="note">Nothing blocking. Every row has a task type, an opening prompt, 10 rubric criteria, a target deliverable, both model names, and a Model A login.</div>`);
+      : `<div class="note">Nothing blocking. Every row has a task type, an opening prompt, ${uploadFromCustomer?"":"10 rubric criteria, "}a target deliverable, both model names, and a Model A login.</div>`);
   if(broken.length) renderRows(document.getElementById("upload-broken"), ["og_task_id","model_b_name","blocking"], shown);
 }
 function uploadHeaderList(){
